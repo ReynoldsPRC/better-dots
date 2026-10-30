@@ -29,7 +29,7 @@ Non-negotiable. Don't add any of these, even as an option:
 - Every rule has unit tests. Run the full suite after every change. A change that breaks an earlier mechanic isn't done.
 - All feel parameters (fall speed, easing, bounce, line thickness, animation timings, bomb radius, etc.) live in one config file so they can be tuned without touching logic. The player will describe feel problems in plain language ("too floaty," "the snap is late"); translate those into config changes.
 - Levels are JSON data files, not code.
-- Progress is saved locally (IndexedDB or localStorage), with export/import of the save as a file.
+- Progress is saved locally (IndexedDB or localStorage), with export/import of the save as a file. On iOS the home-screen app has its own localStorage, separate from Safari, so progress from Safari playtesting doesn't follow an install (use export/import to move it).
 - Service worker for offline play.
 - A developer switch (settings toggle or URL flag) unlocks all levels for testing.
 - Commit after each working step with a clear message.
