@@ -8,6 +8,8 @@ export interface BotNote {
   winRate: number;
   median: number;
   p10: number;
+  /** Too short for separate 2- and 3-star cutoffs: any clear earns 3 stars. */
+  oneTier?: boolean;
 }
 
 export type LevelFile = Omit<LevelDef, 'label'> & { bot?: BotNote };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeLevel, candidateMoves, findLoops, percentile, playOnce, tuneFromStats, type LevelStats } from '../src/bot/bot';
+import { analyzeLevel, candidateMoves, findLoops, isLuckHeavy, percentile, playOnce, tuneFromStats, type LevelStats } from '../src/bot/bot';
 import { formatLevelJson, toLevelFile } from '../src/bot/format';
 import { generateCandidate } from '../src/bot/generate';
 import { candidates, catalog } from '../src/levels';
@@ -91,11 +91,25 @@ describe('tuning from bot results', () => {
     expect(tuneFromStats(stats([10, 12], 10))).toBeNull();
   });
 
-  it('keeps 1 <= three <= two <= moves', () => {
-    const t = tuneFromStats(stats([2, 2, 2, 2]))!;
-    expect(t.stars.three).toBeLessThanOrEqual(t.stars.two);
-    expect(t.stars.two).toBeLessThanOrEqual(t.moves);
-    expect(t.stars.three).toBeGreaterThanOrEqual(1);
+  it('keeps 1 <= three < two <= moves whenever two >= 2', () => {
+    // Tight spreads used to give two === three (3 stars straight after 1).
+    for (const needed of [[2, 2, 2, 2], [3, 3, 3, 3], [5, 6, 6, 6, 7], [9, 9, 10, 10, 10, 11], [4, 8, 12, 16, 20]]) {
+      const t = tuneFromStats(stats(needed))!;
+      expect(t.stars.two, String(needed)).toBeLessThanOrEqual(t.moves);
+      expect(t.stars.three, String(needed)).toBeGreaterThanOrEqual(1);
+      if (t.stars.two >= 2) expect(t.stars.three, String(needed)).toBeLessThan(t.stars.two);
+    }
+  });
+
+  it('gives levels of 2 moves or fewer a single tier', () => {
+    expect(tuneFromStats(stats([1, 1, 2, 2]))).toEqual({ moves: 2, stars: { two: 1, three: 1 }, oneTier: true });
+    expect(tuneFromStats(stats([3, 3, 3, 3]))!.oneTier).toBeUndefined();
+  });
+
+  it('flags levels where the outcome is mostly refill luck', () => {
+    // Like 7-07 before: limit 41 against a median of 24 and a best 10% of 7.
+    expect(isLuckHeavy(stats([7, 9, 15, 20, 24, 26, 30, 38, 41, 45]))).toBe(true);
+    expect(isLuckHeavy(stats([10, 11, 12, 13, 14, 15, 16, 17, 18, 19]))).toBe(false);
   });
 });
 
@@ -131,7 +145,10 @@ describe('level files', () => {
     }
   });
 
-  it('every shipped level has bot-set stars', () => {
-    for (const level of catalog.order) expect(level.stars, level.label).toBeDefined();
+  it('every shipped level has bot-set stars, with 3 stars strictly below 2 unless it has one tier', () => {
+    for (const level of catalog.order) {
+      expect(level.stars, level.label).toBeDefined();
+      if (level.moves > 2) expect(level.stars!.three, level.label).toBeLessThan(level.stars!.two);
+    }
   });
 });

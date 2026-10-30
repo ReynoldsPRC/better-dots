@@ -1,7 +1,7 @@
 // Level generator: builds candidate levels from parameters, then lets the bot
 // set the goal size, move limit, and star cutoffs. Seeded and pure.
 import { parseLevel, Rng, seedRng, type ColorId, type Goal, type LevelDef, type PlacedPiece, type Wall } from '../rules';
-import { analyzeLevel, tuneFromStats, type LevelStats } from './bot';
+import { analyzeLevel, isLuckHeavy, tuneFromStats, type LevelStats, type Tuning } from './bot';
 import type { BotNote } from './format';
 
 export interface GenParams {
@@ -214,19 +214,37 @@ function tryCandidate(p: GenParams, seed: number, name?: string): Candidate | nu
   const walls = makeWalls(p, layout, rng);
   const goalColors = rng.shuffle(palette).slice(0, p.collectGoals).sort((a, b) => a - b);
   const runs = p.runs ?? 40;
-  const pieces = placePieces(p, layout, rng.shuffle(palette), rng);
+  const piecePalette = rng.shuffle(palette);
+  const pieceSeed = rng.int(1_000_000);
   const iceSeed = rng.int(1_000_000);
-  const { cells: water, ice: waterIce } = placeLayer(p.water && { count: p.water.sources, underIce: p.water.underIce }, p, layout, rng);
-  const { cells: slime, ice: slimeIce } = placeLayer(p.slime && { count: p.slime.cells, underIce: p.slime.underIce }, p, layout, rng);
-  const { cells: fire, ice: fireIce } = placeLayer(p.fire && { count: p.fire.cells, underIce: p.fire.underIce }, p, layout, rng);
+  const layerSeed = rng.int(1_000_000);
+  // The goal-size lever: obstacle counts scale with `count` relative to where it starts,
+  // so worlds without collect goals converge instead of just reseeding.
+  const count0 = p.collectGoals > 0 ? 12 : 18;
+  const cellCount = layout.join('').replace(/-/g, '').length;
+  const scaled = (n: number | undefined, count: number, cap: number) =>
+    n ? Math.min(Math.max(1, cap), Math.max(1, Math.round((n * count) / count0))) : 0;
+  const layer = (spec: { count: number; underIce?: number } | undefined, count: number, cap: number, k: number) =>
+    placeLayer(spec && { ...spec, count: scaled(spec.count, count, cap) }, p, layout, new Rng(seedRng(layerSeed + k)));
 
   const build = (count: number, moves: number): LevelDef => {
+    const pieceCap = Math.floor(cellCount / 6);
+    const pieces = placePieces({
+      ...p,
+      gems: p.gems && { ...p.gems, count: scaled(p.gems.count, count, pieceCap) },
+      ladybugs: scaled(p.ladybugs, count, pieceCap),
+    }, layout, piecePalette, new Rng(seedRng(pieceSeed)));
+    const { cells: water, ice: waterIce } = layer(p.water && { count: p.water.sources, underIce: p.water.underIce }, count, cellCount / 2, 1);
+    const { cells: slime, ice: slimeIce } = layer(p.slime && { count: p.slime.cells, underIce: p.slime.underIce }, count, cellCount / 2, 2);
+    const { cells: fire, ice: fireIce } = layer(p.fire && { count: p.fire.cells, underIce: p.fire.underIce }, count, cellCount / 3, 3);
     const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
     let ice = p.ice ? placeIce(p, layout, Math.min(p.ice.max, Math.round(count * p.ice.perSize)), new Rng(seedRng(iceSeed))) : undefined;
     const iceCount = ice ? ice.join('').replace(/\./g, '').length : 0;
     if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
-    if (p.gems?.count) goals.unshift({ type: 'gems', count: p.gems.count });
-    if (p.ladybugs) goals.unshift({ type: 'ladybugs', count: p.ladybugs });
+    const gems = pieces.filter((x) => x.type === 'gem').length;
+    const bugs = pieces.filter((x) => x.type === 'ladybug').length;
+    if (gems) goals.unshift({ type: 'gems', count: gems });
+    if (bugs) goals.unshift({ type: 'ladybugs', count: bugs });
     if (water) goals.unshift({ type: 'flood' });
     if (slime) goals.unshift({ type: 'slime' });
     if (fire) goals.unshift({ type: 'fire' });
@@ -268,8 +286,8 @@ function tryCandidate(p: GenParams, seed: number, name?: string): Candidate | nu
       // Re-measure with more runs and fresh seeds before settling the numbers.
       const check = analyzeLevel(level, runs * 2, seed + 1000);
       const t2 = tuneFromStats(check);
-      if (!t2) return null;
-      return { level: { ...level, moves: t2.moves, stars: t2.stars }, bot: botNote(check, t2.moves) };
+      if (!t2 || isLuckHeavy(check)) return null;
+      return { level: { ...level, moves: t2.moves, stars: t2.stars }, bot: botNote(check, t2) };
     }
     const needed = Number.isFinite(stats.p75) ? stats.p75 : hi * 2;
     count = Math.max(3, Math.round((count * mid) / needed));
@@ -279,8 +297,11 @@ function tryCandidate(p: GenParams, seed: number, name?: string): Candidate | nu
   return null;
 }
 
-/** Summary stored in the level file. Win rate is at the given move limit. */
-export function botNote(stats: LevelStats, moves: number): BotNote {
-  const wins = stats.movesNeeded.filter((m) => m <= moves).length;
-  return { runs: stats.runs, winRate: Math.round((wins / stats.runs) * 100) / 100, median: stats.median, p10: stats.p10 };
+/** Summary stored in the level file. Win rate is at the tuned move limit. */
+export function botNote(stats: LevelStats, t: Tuning): BotNote {
+  const wins = stats.movesNeeded.filter((m) => m <= t.moves).length;
+  return {
+    runs: stats.runs, winRate: Math.round((wins / stats.runs) * 100) / 100, median: stats.median, p10: stats.p10,
+    ...(t.oneTier ? { oneTier: true } : {}),
+  };
 }

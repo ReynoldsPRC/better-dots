@@ -373,6 +373,8 @@ export function analyzeLevel(level: LevelDef, runs = 100, seed = 1, opts: BotOpt
 export interface Tuning {
   moves: number;
   stars: { two: number; three: number };
+  /** Too short for separate 2- and 3-star cutoffs. */
+  oneTier?: boolean;
 }
 
 /** Bot share of runs that should fit in the move limit. */
@@ -380,12 +382,25 @@ export const TARGET_WIN_RATE = 0.75;
 
 /**
  * Move limit and star cutoffs from bot results: the limit fits ~75% of bot
- * runs; 2 stars for beating the bot's median; 3 for matching its best 10%.
+ * runs; 2 stars for beating the bot's median; 3 for matching its best 10%,
+ * always strictly fewer moves than 2 stars. Levels of 2 moves or fewer have
+ * one tier (two = three = 1).
  */
 export function tuneFromStats(stats: LevelStats): Tuning | null {
   if (stats.finishRate < TARGET_WIN_RATE || !Number.isFinite(stats.p75)) return null;
   const moves = stats.p75;
-  const two = Math.max(1, Math.min(moves, stats.median - 1));
-  const three = Math.max(1, Math.min(two, stats.p10));
+  if (moves <= 2) return { moves, stars: { two: 1, three: 1 }, oneTier: true };
+  const two = Math.max(2, Math.min(moves, stats.median - 1));
+  const three = Math.max(1, Math.min(two - 1, stats.p10));
   return { moves, stars: { two, three } };
+}
+
+/** Move limit over median: above this, whether a run fits the limit is mostly refill luck. */
+export const MAX_LIMIT_TO_MEDIAN = 1.6;
+/** Median over the best 10%: above this, 3 stars is mostly refill luck. */
+export const MAX_MEDIAN_TO_BEST = 2.2;
+
+/** True when the bot's results spread so wide that the outcome is mostly refill luck. */
+export function isLuckHeavy(stats: LevelStats): boolean {
+  return stats.p75 / stats.median > MAX_LIMIT_TO_MEDIAN || stats.median / stats.p10 > MAX_MEDIAN_TO_BEST;
 }

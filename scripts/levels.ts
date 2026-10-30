@@ -10,7 +10,7 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { analyzeLevel, tuneFromStats } from '../src/bot/bot';
+import { analyzeLevel, isLuckHeavy, tuneFromStats } from '../src/bot/bot';
 import { formatLevelJson, toLevelFile } from '../src/bot/format';
 import { botNote, generateCandidate } from '../src/bot/generate';
 import { presets } from '../src/bot/presets';
@@ -115,8 +115,9 @@ switch (cmd) {
           continue;
         }
         const next = { ...level, moves: t.moves, stars: t.stars };
-        writeFileSync(join(worldDir(w), f), formatLevelJson(toLevelFile(next, botNote(stats, t.moves))));
-        console.log(`${level.label}: moves ${level.moves} -> ${t.moves}, stars 2@${t.stars.two} 3@${t.stars.three}, bot median ${stats.median}`);
+        writeFileSync(join(worldDir(w), f), formatLevelJson(toLevelFile(next, botNote(stats, t))));
+        const flags = [isLuckHeavy(stats) ? 'luck-heavy' : '', t.oneTier ? 'one-tier' : ''].filter(Boolean).join(' ');
+        console.log(`${level.label}: moves ${level.moves} -> ${t.moves}, stars 2@${t.stars.two} 3@${t.stars.three}, bot median ${stats.median} p10 ${stats.p10}${flags ? `  ${flags}` : ''}`);
       }
     }
     break;
