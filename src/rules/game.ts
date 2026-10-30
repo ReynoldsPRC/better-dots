@@ -64,6 +64,8 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     return n;
   });
 
+  const water = cells.map((_, i) => (level.water?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x');
+
   const startAnchors = cells.filter((p) => p?.kind === 'anchor').length;
   const state: GameState = {
     rows,
@@ -72,7 +74,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     wallRight,
     wallDown,
     cells,
-    layers: { ice },
+    layers: { ice, water },
     colors: level.colors.slice(),
     rng: 0,
     nextId,
@@ -115,8 +117,13 @@ export function movesLeft(s: GameState): number {
 }
 
 /** How much of a goal is left (0 when met). */
-export function goalRemaining(_s: GameState, g: GoalState): number {
-  return Math.max(0, g.goal.count - g.progress);
+export function goalRemaining(s: GameState, g: GoalState): number {
+  switch (g.goal.type) {
+    case 'flood':
+      return s.playable.filter((p, i) => p && !s.layers.water[i]).length;
+    default:
+      return Math.max(0, g.goal.count - g.progress);
+  }
 }
 
 export function goalDone(s: GameState, g: GoalState): boolean {
@@ -145,7 +152,7 @@ function isFixed(s: GameState, i: number): boolean {
 }
 
 function cloneLayers(l: Layers): Layers {
-  return { ice: l.ice.slice() };
+  return { ice: l.ice.slice(), water: l.water.slice() };
 }
 
 /**
@@ -227,12 +234,33 @@ class Move {
   }
 
   /**
-   * End-of-cascade layer effects. Ice loses one layer if a cell next to it was
-   * cleared or a blast reached it (one layer per move at most).
+   * End-of-cascade layer effects, in order:
+   * - Water: cleared cells touching active water become watered, and the flood
+   *   carries on through every connected cleared cell.
+   * - Ice loses one layer if a cell next to it was cleared or a blast reached it
+   *   (one layer per move at most). Hazards under it wake up from then on.
    */
   react(): void {
     const { s, layers } = this;
     const changed: number[] = [];
+
+    const wet = (i: number) => layers.water[i] && layers.ice[i] === 0;
+    const queue = [...this.cleared].filter((i) => !layers.water[i] && orthogonal(s, i).some(wet));
+    const flooded = new Set(queue);
+    while (queue.length > 0) {
+      const i = queue.shift()!;
+      for (const j of orthogonal(s, i)) {
+        if (this.cleared.has(j) && !layers.water[j] && !flooded.has(j)) {
+          flooded.add(j);
+          queue.push(j);
+        }
+      }
+    }
+    for (const i of [...flooded].sort((a, b) => a - b)) {
+      layers.water[i] = true;
+      changed.push(i);
+    }
+
     for (let i = 0; i < layers.ice.length; i++) {
       if (layers.ice[i] === 0) continue;
       const near = this.blasted.has(i) || orthogonal(s, i).some((j) => this.cleared.has(j));
@@ -372,6 +400,8 @@ function progressFor(g: GoalState, t: Tally): number {
       return t.anchors;
     case 'ice':
       return t.ice;
+    case 'flood':
+      return 0;
   }
 }
 

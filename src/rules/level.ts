@@ -85,6 +85,7 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
   };
   const ice = grid('ice', /^[1-3]$/, '1-3 for thickness');
   const iceCells = (ice ?? []).join('').replace(/\./g, '').length;
+  const water = grid('water', /^x$/, 'x for watered');
 
   let anchorDrops: number | undefined;
   if (o.anchorDrops !== undefined) {
@@ -108,6 +109,9 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
         if (count > startAnchors + (anchorDrops ?? 0)) fail(`goal ${k}: needs ${count} anchors but the level only has ${startAnchors + (anchorDrops ?? 0)}`);
         return { type: 'anchors', count };
       }
+      case 'flood':
+        if (!water) fail(`goal ${k}: a flood goal needs some starting "water"`);
+        return { type: 'flood' };
       case 'ice': {
         const count = positive(go.count, k);
         if (count > iceCells) fail(`goal ${k}: needs ${count} ice but the level only has ${iceCells}`);
@@ -138,6 +142,7 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     pieces,
     anchorDrops,
     ice,
+    water,
     goals,
     stars,
   };

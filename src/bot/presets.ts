@@ -34,4 +34,10 @@ export const presets: Record<number, Preset> = {
     collectGoals: lerp(0, 1, t), ice: { perSize: 0.6, max: 16, thickness: [1, lerp(1, 3, t)] },
     targetMoves: [lerp(10, 20, t), lerp(18, 30, t)],
   }),
+  // World 6: water (some sources frozen over later on).
+  6: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: lerp(3, 5, t), holes: lerp(0, 4, t),
+    collectGoals: 0, water: { sources: lerp(1, 4, t), underIce: t > 0.6 ? 2 : 0 },
+    targetMoves: [lerp(6, 18, t), lerp(16, 34, t)],
+  }),
 };

@@ -86,6 +86,14 @@ export const config = {
     crackMs: 220,
   },
 
+  water: {
+    /** Watered-cell tile, light and dark themes. Kept paler and greener than the slate dot. */
+    fill: { light: '#A9D3D6', dark: '#2F5A60' },
+    /** Tile size and corner radius as fractions of cell size. */
+    scale: 0.94,
+    radius: 0.24,
+  },
+
   shuffle: {
     /** Pause before an automatic reshuffle, then how long dots take to swap places. */
     delayMs: 250,

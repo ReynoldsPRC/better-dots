@@ -22,9 +22,15 @@ export interface Frame {
   blasts: { r: number; c: number; type: BlastType; progress: number }[];
   /** Cell layers as of this moment. */
   layers: Layers;
-  /** Cells whose layers just changed, with 0..1 progress, for a brief flash. */
-  changed: { cell: number; progress: number }[];
+  /** Cells whose layers just changed, which layer, and 0..1 progress, for a brief effect. */
+  changed: LayerChange[];
   done: boolean;
+}
+
+export interface LayerChange {
+  cell: number;
+  layer: keyof Layers;
+  progress: number;
 }
 
 interface Segment {
@@ -34,6 +40,8 @@ interface Segment {
   before: Cells;
   /** Per piece id: fall duration (fall events only). */
   fallMs?: Map<number, number>;
+  /** Layers before this event (layers events only). */
+  prevLayers?: Layers;
 }
 
 type Pos = [number, number];
@@ -59,8 +67,13 @@ export class MoveAnimation {
     const { speed, minMs, settleMs } = config.fall;
     let t = 0;
     let before = prev.cells;
+    let layers = prev.layers;
     for (const event of result.events) {
       const seg: Segment = { start: t, dur: 0, event, before };
+      if (event.kind === 'layers') {
+        seg.prevLayers = layers;
+        layers = event.layers;
+      }
       switch (event.kind) {
         case 'clear':
           seg.dur = Math.max(config.cascade.stepMs, popMs, event.step.kind === 'blast' ? config.bomb.explodeMs : 0);
@@ -112,7 +125,13 @@ export class MoveAnimation {
       if (s.event.kind === 'layers' && t >= s.start) {
         layers = s.event.layers;
         const p = (t - s.start) / s.dur;
-        if (p < 1) for (const cell of s.event.cells) changed.push({ cell, progress: p });
+        if (p < 1) {
+          for (const cell of s.event.cells) {
+            for (const layer of Object.keys(layers) as (keyof Layers)[]) {
+              if (layers[layer][cell] !== s.prevLayers![layer][cell]) changed.push({ cell, layer, progress: p });
+            }
+          }
+        }
       }
       if (s.event.kind !== 'clear') continue;
       const lt = t - s.start;

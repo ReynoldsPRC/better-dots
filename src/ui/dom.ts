@@ -61,6 +61,12 @@ export function goalIcon(goal: Goal, colorblind: boolean, size = 22): HTMLCanvas
     case 'anchors':
       drawPiece(ctx, { kind: 'anchor', id: 0 }, r, r, r * 0.78, { theme, colorblind });
       break;
+    case 'flood':
+      ctx.fillStyle = config.water.fill[theme];
+      ctx.beginPath();
+      ctx.roundRect(2, 2, size - 4, size - 4, size * 0.26);
+      ctx.fill();
+      break;
     case 'ice':
       ctx.fillStyle = config.ice.fill[theme][3];
       ctx.strokeStyle = config.ice.edge[theme];

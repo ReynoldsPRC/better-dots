@@ -35,12 +35,16 @@ export type PlacedPiece = { r: number; c: number; type: 'anchor' };
 export type Goal =
   | { type: 'collect'; color: ColorId; count: number }
   | { type: 'anchors'; count: number }
-  | { type: 'ice'; count: number };
+  | { type: 'ice'; count: number }
+  /** Water every cell. */
+  | { type: 'flood' };
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
   /** Ice thickness, 0-3. A frozen cell's piece is locked in place and can't be connected. */
   ice: number[];
+  /** Watered cells. Water under ice is dormant until the ice breaks. */
+  water: boolean[];
 }
 
 export interface GoalState {
@@ -69,6 +73,8 @@ export interface LevelDef {
   anchorDrops?: number;
   /** Ice thickness per cell: one string per row, '.' none or '1'-'3'. */
   ice?: string[];
+  /** Watered cells at the start: one string per row, '.' dry or 'x' watered. */
+  water?: string[];
   goals: Goal[];
   /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
   stars?: { two: number; three: number };

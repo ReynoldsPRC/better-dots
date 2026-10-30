@@ -2,7 +2,8 @@
 import { config } from '../config';
 import { connectableColor, type ColorId, type GameState, type Layers, type Piece } from '../rules';
 import type { Surface, Theme } from './canvas';
-import type { Frame, SpriteFrame } from './animation';
+import type { Frame, LayerChange, SpriteFrame } from './animation';
+import { ease } from './easing';
 import { toScreen, type Layout } from './layout';
 
 export interface DrawOptions {
@@ -44,6 +45,7 @@ export function drawScene(
   ctx.fillRect(0, 0, width, height);
 
   drawTerrain(ctx, layout, state, theme);
+  drawWater(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
 
   const dragColor = drag && drag.path.length > 0 ? connectableColor(state, drag.path[0]) : null;
 
@@ -122,13 +124,13 @@ export function drawScene(
  */
 function drawIce(
   ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers,
-  changed: { cell: number; progress: number }[], theme: Theme,
+  changed: LayerChange[], theme: Theme,
 ) {
   const { cell, x0, y0 } = layout;
   const t = config.ice;
   const size = cell * t.scale;
   const pad = (cell - size) / 2;
-  const flash = new Map(changed.map((c) => [c.cell, c.progress]));
+  const flash = new Map(changed.filter((c) => c.layer === 'ice').map((c) => [c.cell, c.progress]));
   for (let i = 0; i < layers.ice.length; i++) {
     const n = layers.ice[i];
     const f = flash.get(i);
@@ -171,6 +173,26 @@ function drawIce(
       ctx.roundRect(x, y, size, size, cell * t.radius);
       ctx.fill();
     }
+  }
+}
+
+/** Watered cells: a soft tile under the dots. New water spreads in from the center. */
+function drawWater(
+  ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers, changed: LayerChange[], theme: Theme,
+) {
+  const { cell, x0, y0 } = layout;
+  const t = config.water;
+  const grow = new Map(changed.filter((c) => c.layer === 'water').map((c) => [c.cell, c.progress]));
+  ctx.fillStyle = t.fill[theme];
+  for (let i = 0; i < layers.water.length; i++) {
+    if (!layers.water[i]) continue;
+    const g = grow.has(i) ? ease('easeOutCubic', grow.get(i)!) : 1;
+    const size = cell * t.scale * (0.3 + 0.7 * g);
+    const x = x0 + (i % s.cols + 0.5) * cell - size / 2;
+    const y = y0 + (Math.floor(i / s.cols) + 0.5) * cell - size / 2;
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, cell * t.radius);
+    ctx.fill();
   }
 }
 

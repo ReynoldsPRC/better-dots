@@ -22,6 +22,8 @@ export interface GenParams {
    * in the given range; the goal is to break it all.
    */
   ice?: { perSize: number; max: number; thickness: [number, number] };
+  /** Flood goal: this many watered cells to start (mirrored), `underIce` of them frozen over. */
+  water?: { sources: number; underIce?: number };
   /** The move limit should land in this range. */
   targetMoves: [number, number];
   /** Bot runs per measurement. */
@@ -141,6 +143,32 @@ function placeIce(p: GenParams, layout: string[], cells: number, rng: Rng): stri
   return grid.map((row) => row.join(''));
 }
 
+/** Mirrored water sources; `underIce` of them (in pairs) get 1-2 layers of ice on top. */
+function placeWater(p: GenParams, layout: string[], rng: Rng): { water?: string[]; waterIce?: string[] } {
+  if (!p.water) return {};
+  const water = layout.map((row) => [...row].map(() => '.'));
+  const ice = layout.map((row) => [...row].map(() => '.'));
+  let placed = 0;
+  let frozen = 0;
+  for (let guard = 0; placed < p.water.sources && guard < 500; guard++) {
+    const r = rng.int(p.rows);
+    const c = rng.int(Math.ceil(p.cols / 2));
+    const m = mirrorCol(p.cols, c);
+    if (layout[r][c] === '-' || water[r][c] !== '.') continue;
+    water[r][c] = water[r][m] = 'x';
+    if (frozen < (p.water.underIce ?? 0) && r > 0) {
+      ice[r][c] = ice[r][m] = String(1 + rng.int(2));
+      frozen += c === m ? 1 : 2;
+    }
+    placed += c === m ? 1 : 2;
+  }
+  return { water: water.map((r) => r.join('')), waterIce: frozen > 0 ? ice.map((r) => r.join('')) : undefined };
+}
+
+function mergeIce(a: string[] | undefined, b: string[], layout: string[]): string[] {
+  return layout.map((row, r) => [...row].map((_, c) => (b[r][c] !== '.' ? b[r][c] : a?.[r][c] ?? '.')).join(''));
+}
+
 /** Builds one candidate, or null if the bot couldn't make it fit the target. */
 export function generateCandidate(p: GenParams, seed: number, name?: string): Candidate | null {
   const rng = new Rng(seedRng(seed));
@@ -151,12 +179,18 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const runs = p.runs ?? 40;
   const pieces = placePieces(p, layout, rng);
   const iceSeed = rng.int(1_000_000);
+  const { water, waterIce } = placeWater(p, layout, rng);
 
   const build = (count: number, moves: number): LevelDef => {
     const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
-    const ice = p.ice ? placeIce(p, layout, Math.min(p.ice.max, Math.round(count * p.ice.perSize)), new Rng(seedRng(iceSeed))) : undefined;
+    let ice = p.ice ? placeIce(p, layout, Math.min(p.ice.max, Math.round(count * p.ice.perSize)), new Rng(seedRng(iceSeed))) : undefined;
     const iceCount = ice ? ice.join('').replace(/\./g, '').length : 0;
     if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
+    if (water) {
+      goals.unshift({ type: 'flood' });
+      // Freeze over some sources (hazards under ice).
+      if (waterIce) ice = mergeIce(ice, waterIce, layout);
+    }
     let anchorDrops: number | undefined;
     if (p.anchors) {
       anchorDrops = Math.max(0, Math.round(count * p.anchors.dropsPerSize));
@@ -172,6 +206,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
       ...(pieces.length ? { pieces } : {}),
       ...(anchorDrops ? { anchorDrops } : {}),
       ...(ice ? { ice } : {}),
+      ...(water ? { water } : {}),
       goals,
     }, 'candidate');
   };
