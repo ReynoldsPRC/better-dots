@@ -1,7 +1,7 @@
 import { candidates, catalog } from './levels';
-import { isUnlocked, recordWin, type SaveData } from './progress';
+import { awardPowerUps, isUnlocked, recordWin, spendPowerUp, type SaveData } from './progress';
 import { createGame, starsFor, type GameState, type LevelDef } from './rules';
-import { el } from './ui/dom';
+import { dotIcon, el } from './ui/dom';
 import { hideCard, showCard } from './ui/overlay';
 import { PlayScreen } from './ui/play';
 import { renderSelect } from './ui/select';
@@ -12,6 +12,11 @@ const $ = (id: string) => document.getElementById(id)!;
 /** Level labels ("4-3", "c4-2") to stable ids, for migrating old saves keyed on labels. */
 const labelToId = new Map([...catalog.order, ...candidates.order].map((l) => [l.label, l.id]));
 let save: SaveData = loadSave(labelToId);
+// Catch up on power-ups earned before they existed (or under looser thresholds after a retune).
+{
+  const r = awardPowerUps(save, catalog.worlds);
+  if (r.earned > 0) storeSave((save = r.save));
+}
 /** Developer switch from the URL: ?dev or ?dev=1 unlocks every level. */
 const devFromUrl = /[?&]dev(=1|=true)?(&|$)/.test(location.search);
 const devUnlock = () => devFromUrl || save.settings.devUnlock;
@@ -26,8 +31,60 @@ function persist(next: SaveData): void {
 const play = new PlayScreen(
   $('game') as HTMLCanvasElement,
   { top: $('hud'), goals: $('goals'), moves: $('moves') },
-  { onEnd, colorblind: () => save.settings.colorblind },
+  {
+    onEnd,
+    colorblind: () => save.settings.colorblind,
+    // The developer switch also makes power-ups free, for testing.
+    powerUsed: () => {
+      if (!devUnlock()) persist(spendPowerUp(save));
+      renderPowerButton();
+    },
+    pickingChanged: () => renderPowerButton(),
+  },
 );
+
+// --- power-ups -------------------------------------------------------------
+
+function powerUpsOnHand(): number {
+  return devUnlock() ? Infinity : save.powerUps;
+}
+
+function renderPowerButton(): void {
+  const btn = $('btn-power');
+  const n = powerUpsOnHand();
+  btn.hidden = n < 1 && !play.isPicking;
+  btn.classList.toggle('armed', play.isPicking);
+  btn.textContent = play.isPicking ? '✕' : `✦ ${n === Infinity ? '∞' : n}`;
+  btn.setAttribute('aria-label', play.isPicking ? 'Cancel pick' : `Power-ups: ${n === Infinity ? 'unlimited' : n}`);
+  $('level-label').textContent = play.isPicking ? 'Tap a dot, ice, or fire to pick it' : levelLabel();
+}
+
+function levelLabel(): string {
+  if (!current) return '';
+  return current.name ? `${current.label} · ${current.name}` : current.label;
+}
+
+function openPowerUps(): void {
+  if (play.isPicking) return play.setPicking(false);
+  if (powerUpsOnHand() < 1 || !play.ready()) return;
+  const n = powerUpsOnHand();
+  const cb = save.settings.colorblind;
+  showCard('Power-ups', [
+    el('p', {}, n === Infinity ? 'Unlimited (developer switch). Using one costs no move.' : `You have ${n}. Using one costs no move.`),
+    el('h3', {}, 'Color clear'),
+    el('div', { class: 'swatches' },
+      ...play.game.colors.map((color) =>
+        el('button', {
+          class: 'swatch', 'aria-label': `Clear color ${color + 1}`,
+          onClick: () => { hideCard(); play.usePowerUp({ kind: 'colorClear', color }); },
+        }, dotIcon(color, cb, 30)),
+      ),
+    ),
+  ], [
+    { label: 'Pick a dot or obstacle', primary: true, onClick: () => { hideCard(); play.setPicking(true); } },
+    { label: 'Cancel', onClick: hideCard },
+  ]);
+}
 
 // --- screens ---------------------------------------------------------------
 
@@ -49,9 +106,9 @@ function startLevel(id: string): void {
   current = level;
   $('select').hidden = true;
   $('play').hidden = false;
-  $('level-label').textContent = level.name ? `${level.label} · ${level.name}` : level.label;
   // Same opening board every time; refills differ per attempt.
   play.start(createGame(level, { playSeed: (Math.random() * 2 ** 32) >>> 0 }));
+  renderPowerButton();
 }
 
 function nextLevelId(id: string): string | null {
@@ -66,13 +123,15 @@ function onEnd(state: GameState): void {
   if (!level) return;
   if (state.status === 'won') {
     const stars = starsFor(level, state.movesUsed, state.assisted);
-    persist(recordWin(save, level.id, state.movesUsed, state.assisted));
+    const awarded = awardPowerUps(recordWin(save, level.id, state.movesUsed, state.assisted), catalog.worlds);
+    persist(awarded.save);
     const next = nextLevelId(level.id);
     showCard('Cleared!', [
       state.assisted
         ? el('p', { class: 'note' }, 'Cleared with the assist. The next level is open; replay without it to earn stars.')
         : el('div', { class: 'result-stars', 'aria-label': `${stars} stars` }, '★'.repeat(stars) + '☆'.repeat(3 - stars)),
       el('p', {}, `${state.movesUsed} moves used`),
+      ...(awarded.earned > 0 ? [el('p', { class: 'note' }, `You earned ${awarded.earned} power-up${awarded.earned > 1 ? 's' : ''}.`)] : []),
     ], [
       ...(next ? [{ label: 'Next level', primary: true, onClick: () => startLevel(next) }] : []),
       { label: 'Replay', primary: !next, onClick: () => startLevel(level.id) },
@@ -139,6 +198,7 @@ function openSettings(): void {
 
 $('btn-back').addEventListener('click', showSelect);
 $('btn-menu').addEventListener('click', openPlayMenu);
+$('btn-power').addEventListener('click', openPowerUps);
 $('btn-options').addEventListener('click', openSettings);
 window.addEventListener('resize', () => play.resize());
 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {

@@ -5,7 +5,7 @@ import { canCross, cellsAround, toIndex } from './board';
 import { connectableColor, enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
 import type {
-  BlastSource, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, Tally,
+  BlastSource, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, PowerUp, Tally,
 } from './types';
 
 export interface GameOptions {
@@ -302,7 +302,7 @@ class Move {
   }
 
   /** Sets off the gem at i (if there is one, unfrozen and not yet set off). */
-  private trigger(i: number): BlastSource | null {
+  trigger(i: number): BlastSource | null {
     const p = this.cells[i];
     if (p?.kind !== 'gem' || this.layers.ice[i] > 0 || this.triggered.has(p.id)) return null;
     this.triggered.add(p.id);
@@ -412,9 +412,12 @@ class Move {
       ? this.cells.flatMap((p, i) => (p?.kind === 'gem' && p.color === color ? [this.trigger(i)!].filter(Boolean) : []))
       : [];
     this.stage(loop ? 'loop' : 'line', first);
+    this.waves([...bombs.map((cell): BlastSource => ({ cell, type: 'bomb' })), ...gems]);
+  }
 
-    // Each wave fires together; gems a wave reaches fire in the next one.
-    let sources: BlastSource[] = [...bombs.map((cell): BlastSource => ({ cell, type: 'bomb' })), ...gems].sort((a, b) => a.cell - b.cell);
+  /** Blast waves: each fires together; gems a wave reaches fire in the next one. */
+  waves(start: BlastSource[]): void {
+    let sources = start.slice().sort((a, b) => a.cell - b.cell);
     while (sources.length > 0) {
       const hit = new Set<number>();
       for (const src of sources) for (const j of this.reach(src)) hit.add(j);
@@ -591,15 +594,71 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   m.fly();
   m.settle();
   m.spread();
-  const settled = m.cells.slice();
+  return finish(s, m, { path: path.slice(), color, loop, usesMove: true });
+}
 
+/** Can this power-up be used on this board right now? */
+export function canUsePowerUp(s: GameState, p: PowerUp): boolean {
+  if (s.status !== 'playing') return false;
+  if (p.kind === 'colorClear') return s.colors.includes(p.color);
+  const i = p.cell;
+  if (!Number.isInteger(i) || i < 0 || i >= s.cells.length || !s.playable[i]) return false;
+  if (s.layers.ice[i] > 0) return true;
+  if (s.layers.fire[i]) return true;
+  const k = s.cells[i]?.kind;
+  return k === 'dot' || k === 'ladybug' || k === 'gem';
+}
+
+/**
+ * Uses a power-up. Costs no move and doesn't mark the attempt assisted. Its
+ * clears count like any other (goals, ice, water, fire, slime, ladybugs), and
+ * the board settles and refills, but hazards don't spread: it isn't a move.
+ * Throws if it can't be used (see canUsePowerUp).
+ */
+export function applyPowerUp(s: GameState, p: PowerUp): { state: GameState; result: MoveResult } {
+  if (!canUsePowerUp(s, p)) throw new Error(`applyPowerUp: can't use ${JSON.stringify(p)} now`);
+  const m = new Move(s);
+  let color: ColorId = 0;
+  if (p.kind === 'colorClear') {
+    color = p.color;
+    m.cascade([], color, true);
+  } else {
+    const i = p.cell;
+    const piece = s.cells[i];
+    if (piece && 'color' in piece) color = piece.color;
+    if (m.layers.ice[i] > 0 || m.layers.fire[i]) {
+      // One layer off the obstacle: ice before what's under it.
+      if (m.layers.ice[i] > 0) {
+        m.layers.ice[i]--;
+        if (m.layers.ice[i] === 0) m.tally.ice++;
+      } else {
+        m.layers.fire[i] = false;
+      }
+      m.emit({ kind: 'layers', layers: cloneLayers(m.layers), cells: [i] });
+    } else if (piece?.kind === 'gem') {
+      m.waves([m.trigger(i)!]);
+    } else {
+      m.stage('line', [i]);
+    }
+  }
+  m.react();
+  m.fly();
+  m.settle();
+  return finish(s, m, { path: [], color, loop: p.kind === 'colorClear', usesMove: false });
+}
+
+/** Builds the next state and the result from a resolved move or power-up. */
+function finish(
+  s: GameState, m: Move, r: { path: number[]; color: ColorId; loop: boolean; usesMove: boolean },
+): { state: GameState; result: MoveResult } {
+  const settled = m.cells.slice();
   const next: GameState = {
     ...s,
     cells: m.cells,
     layers: m.layers,
     nextId: m.nextId,
     anchorDrops: m.anchorDrops,
-    movesUsed: s.movesUsed + 1,
+    movesUsed: s.movesUsed + (r.usesMove ? 1 : 0),
     goals: s.goals.map((g) => ({ goal: g.goal, progress: g.progress + progressFor(g, m.tally) })),
   };
   if (next.goals.length > 0 && next.goals.every((g) => goalDone(next, g))) next.status = 'won';
@@ -620,9 +679,9 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   return {
     state: next,
     result: {
-      path: path.slice(),
-      color,
-      loop,
+      path: r.path,
+      color: r.color,
+      loop: r.loop,
       events: m.events,
       steps: m.events.flatMap((e) => (e.kind === 'clear' ? [e.step] : [])),
       settled,

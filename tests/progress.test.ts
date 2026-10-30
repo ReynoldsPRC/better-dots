@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { emptySave, isUnlocked, migrateSave, parseSave, recordWin } from '../src/progress';
+import { awardPowerUps, emptySave, isUnlocked, migrateSave, parseSave, recordWin, spendPowerUp } from '../src/progress';
+import { parseLevel } from '../src/rules';
 
 const ORDER = ['aaa111', 'bbb111', 'ccc111'];
 const NO_LABELS = new Map<string, string>();
@@ -76,6 +77,8 @@ describe('version 1 saves', () => {
         ccc111: { bestMoves: 14, assistedOnly: false },
       },
       settings: { colorblind: true, devUnlock: false },
+      powerUps: 0,
+      awarded: { levels: [], worlds: [] },
     });
   });
 
@@ -86,5 +89,55 @@ describe('version 1 saves', () => {
     expect(input).toEqual(copy);
     expect(out.levels).toEqual({ aaa111: { bestMoves: 8, assistedOnly: false } });
     expect(out.settings.devUnlock).toBe(true);
+  });
+});
+
+describe('power-ups', () => {
+  // Stars: 3 at 5 moves or fewer, 2 at 8 or fewer.
+  const level = (id: string) => parseLevel({
+    id, seed: 1, moves: 12, colors: [0, 1], layout: ['..', '..'], goals: [{ type: 'collect', color: 0, count: 2 }], stars: { two: 8, three: 5 },
+  }, id);
+  const worlds = [{ number: 1, levels: [level('aaa111'), level('bbb111')] }, { number: 2, levels: [level('ccc111')] }];
+
+  it('one for a level\'s first 3-star clear, and only once', () => {
+    let save = recordWin(emptySave(), 'aaa111', 7, false);
+    expect(awardPowerUps(save, worlds).earned).toBe(0);
+    save = recordWin(save, 'aaa111', 4, false);
+    const first = awardPowerUps(save, worlds);
+    expect(first.earned).toBe(1);
+    expect(first.save.powerUps).toBe(1);
+    const again = awardPowerUps(recordWin(first.save, 'aaa111', 3, false), worlds);
+    expect(again.earned).toBe(0);
+    expect(again.save.powerUps).toBe(1);
+  });
+
+  it('two for finishing a world, once every level in it has an unassisted clear', () => {
+    let save = recordWin(emptySave(), 'aaa111', 10, false);
+    save = recordWin(save, 'bbb111', 10, true);
+    expect(awardPowerUps(save, worlds).earned).toBe(0);
+    save = recordWin(save, 'bbb111', 9, false);
+    const r = awardPowerUps(save, worlds);
+    expect(r.earned).toBe(2);
+    expect(r.save.awarded.worlds).toEqual([1]);
+    expect(awardPowerUps(r.save, worlds).earned).toBe(0);
+  });
+
+  it('assisted clears earn none, whatever the moves', () => {
+    const save = recordWin(emptySave(), 'ccc111', 1, true);
+    expect(awardPowerUps(save, worlds).earned).toBe(0);
+  });
+
+  it('spending takes one; with none it throws', () => {
+    const save = { ...emptySave(), powerUps: 2 };
+    expect(spendPowerUp(save).powerUps).toBe(1);
+    expect(() => spendPowerUp(emptySave())).toThrow();
+  });
+
+  it('saves from before power-ups load with none; counts and awards round-trip', () => {
+    const old = { version: 2, levels: {}, settings: { colorblind: false, devUnlock: false } };
+    expect(parseSave(old, NO_LABELS)).toEqual(emptySave());
+    const save = { ...emptySave(), powerUps: 3, awarded: { levels: ['aaa111'], worlds: [1] } };
+    expect(parseSave(JSON.parse(JSON.stringify(save)), NO_LABELS)).toEqual(save);
+    expect(() => parseSave({ ...old, powerUps: -1 }, NO_LABELS)).toThrow(/powerUps/);
   });
 });

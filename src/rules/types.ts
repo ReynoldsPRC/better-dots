@@ -201,7 +201,17 @@ export type MoveEvent = { board: Cells } & (
   | { kind: 'shuffle' }
 );
 
+/**
+ * A power-up use. Neither costs a move.
+ * - pick: on a frozen cell, knocks off one layer of ice; on a burning cell,
+ *   puts the fire out; on a dot or ladybug, clears it; on a gem, sets it off.
+ * - colorClear: clears every dot of the color as if a loop of it were made
+ *   (so gems of that color go off), with no bombs since nothing is enclosed.
+ */
+export type PowerUp = { kind: 'pick'; cell: number } | { kind: 'colorClear'; color: ColorId };
+
 export interface MoveResult {
+  /** The line dragged (empty for a power-up). */
   path: number[];
   color: ColorId;
   loop: boolean;

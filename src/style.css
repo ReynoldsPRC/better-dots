@@ -41,6 +41,12 @@ button { font: inherit; color: inherit; }
   font-size: 26px; line-height: 1; cursor: pointer;
 }
 .icon-btn:active { background: var(--line); }
+.power-btn { width: auto; min-width: 40px; padding: 0 8px; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: #DDAE4A; }
+.power-btn.armed { background: var(--line); color: var(--ink); }
+.swatches { display: flex; justify-content: center; gap: 10px; margin: 6px 0 16px; }
+.swatch { border: 2px solid var(--line); border-radius: 50%; background: transparent; padding: 6px; cursor: pointer; line-height: 0; }
+.swatch:active { border-color: var(--accent); }
+.card h3 { margin: 4px 0 6px; font-size: 15px; color: var(--muted); font-weight: 600; }
 
 #overlay {
   position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;

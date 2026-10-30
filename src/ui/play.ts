@@ -5,8 +5,8 @@ import { drawScene, type DragView } from '../render/board';
 import { fitCanvas, type Surface } from '../render/canvas';
 import { cellAt, computeLayout, type Layout } from '../render/layout';
 import {
-  addMoves, applyMove, extendPath, goalDone, goalRemaining, isLoopClosed, isValidPath, movesLeft,
-  type GameState,
+  addMoves, applyMove, applyPowerUp, canUsePowerUp, extendPath, goalDone, goalRemaining, isLoopClosed, isValidPath, movesLeft,
+  type GameState, type PowerUp,
 } from '../rules';
 import { currentTheme, el, goalIcon } from './dom';
 
@@ -14,6 +14,10 @@ export interface PlayHooks {
   /** Called once the final move's animation has finished. */
   onEnd(state: GameState): void;
   colorblind(): boolean;
+  /** A power-up was used (spend it). */
+  powerUsed(): void;
+  /** Pick mode turned on or off. */
+  pickingChanged(on: boolean): void;
 }
 
 export class PlayScreen {
@@ -23,6 +27,8 @@ export class PlayScreen {
   private anim: MoveAnimation | null = null;
   private drag: (DragView & { pointerId: number; last: [number, number] }) | null = null;
   private raf = 0;
+  /** Pick mode: the next tap on the board picks that cell. */
+  private picking = false;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -43,6 +49,7 @@ export class PlayScreen {
     this.state = state;
     this.anim = null;
     this.drag = null;
+    this.setPicking(false);
     this.resize();
     this.renderHud();
   }
@@ -103,6 +110,32 @@ export class PlayScreen {
     return [e.clientX - rect.left, e.clientY - rect.top];
   }
 
+  get isPicking(): boolean {
+    return this.picking;
+  }
+
+  setPicking(on: boolean): void {
+    if (this.picking === on) return;
+    this.picking = on;
+    this.hooks.pickingChanged(on);
+  }
+
+  /** Can a power-up be used right now (game on, no drag, last move landed)? */
+  ready(): boolean {
+    return !this.drag && this.state?.status === 'playing' && this.inputOpen(performance.now());
+  }
+
+  /** Uses a power-up if it can be used now. Returns true if it was. */
+  usePowerUp(p: PowerUp): boolean {
+    if (!this.ready() || !canUsePowerUp(this.state, p)) return false;
+    const { state, result } = applyPowerUp(this.state, p);
+    this.anim = new MoveAnimation(this.state, result, state, performance.now());
+    this.state = state;
+    this.hooks.powerUsed();
+    this.redraw();
+    return true;
+  }
+
   /** A new drag can start once the last move's dots have landed (or, under 'end', once it has fully finished). */
   private inputOpen(now: number): boolean {
     const a = this.anim;
@@ -114,6 +147,11 @@ export class PlayScreen {
     const pt = this.point(e);
     const cell = cellAt(this.layout, pt[0], pt[1]);
     if (cell === null) return;
+    if (this.picking) {
+      // Taps on cells a pick can't change are ignored; the button cancels.
+      if (this.usePowerUp({ kind: 'pick', cell })) this.setPicking(false);
+      return;
+    }
     const path = extendPath(this.state, [], cell);
     if (path.length === 0) return;
     try {
