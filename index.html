@@ -17,13 +17,20 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <section id="play" class="screen">
+    <section id="select" class="screen" hidden>
+      <header class="select-head">
+        <h1>better dots</h1>
+        <button id="btn-options" class="icon-btn" aria-label="Settings">⋯</button>
+      </header>
+      <div id="worlds"></div>
+    </section>
+    <section id="play" class="screen" hidden>
       <canvas id="game"></canvas>
       <header id="hud">
         <button id="btn-back" class="icon-btn" aria-label="Levels">‹</button>
-        <div id="goals"></div>
+        <div id="hud-mid"><div id="level-label"></div><div id="goals"></div></div>
         <div id="moves-box"><span id="moves">0</span><small>moves</small></div>
-        <button id="btn-settings" class="icon-btn" aria-label="Settings">⋯</button>
+        <button id="btn-menu" class="icon-btn" aria-label="Menu">⋯</button>
       </header>
     </section>
     <div id="overlay" hidden></div>

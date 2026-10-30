@@ -1,0 +1,22 @@
+{
+  "name": "Everything",
+  "seed": 1010,
+  "moves": 35,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    "......."
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 22 },
+    { "type": "collect", "color": 1, "count": 22 },
+    { "type": "collect", "color": 2, "count": 22 },
+    { "type": "collect", "color": 3, "count": 22 },
+    { "type": "collect", "color": 4, "count": 22 }
+  ]
+}

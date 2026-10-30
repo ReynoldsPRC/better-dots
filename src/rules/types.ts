@@ -26,13 +26,17 @@ export type Status = 'playing' | 'won' | 'lost';
 
 /** A level as the rules see it. Level JSON files are parsed into this. */
 export interface LevelDef {
+  /** "world-level", e.g. "1-3". Comes from the file's place in the levels folder. */
   id: string;
+  name?: string;
   seed: number;
   moves: number;
   colors: ColorId[];
   /** One string per row: '.' random dot, '0'-'4' a dot of that color. */
   layout: string[];
   goals: Goal[];
+  /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
+  stars?: { two: number; three: number };
 }
 
 export interface GameState {

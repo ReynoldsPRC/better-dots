@@ -1,0 +1,19 @@
+{
+  "name": "Taller",
+  "seed": 1006,
+  "moves": 25,
+  "colors": [0, 1, 2, 3],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 32 },
+    { "type": "collect", "color": 2, "count": 32 }
+  ]
+}

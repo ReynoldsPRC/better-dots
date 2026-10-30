@@ -1,0 +1,19 @@
+{
+  "name": "Three goals",
+  "seed": 1005,
+  "moves": 25,
+  "colors": [0, 1, 2, 3],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 22 },
+    { "type": "collect", "color": 2, "count": 22 },
+    { "type": "collect", "color": 3, "count": 22 }
+  ]
+}

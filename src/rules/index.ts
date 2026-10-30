@@ -6,3 +6,4 @@ export * from './types';
 export * from './board';
 export * from './path';
 export * from './game';
+export * from './level';

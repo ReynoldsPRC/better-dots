@@ -85,6 +85,13 @@ export const config = {
     moves: 5,
   },
 
+  stars: {
+    // Placeholder cutoffs (fractions of the move limit) for levels the bot
+    // hasn't scored yet: 2 stars at or under this many moves, 3 stars likewise.
+    fallbackTwo: 0.8,
+    fallbackThree: 0.6,
+  },
+
   cascade: {
     /** Pause between steps of a chain reaction so it reads clearly. */
     stepMs: 180,

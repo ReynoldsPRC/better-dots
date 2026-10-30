@@ -1,0 +1,19 @@
+{
+  "name": "Spread thin",
+  "seed": 1008,
+  "moves": 30,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 16 },
+    { "type": "collect", "color": 2, "count": 16 },
+    { "type": "collect", "color": 3, "count": 16 }
+  ]
+}
