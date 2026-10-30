@@ -64,6 +64,9 @@ export function goalIcon(goal: Goal, colorblind: boolean, size = 22): HTMLCanvas
     case 'gems':
       drawPiece(ctx, { kind: 'gem', id: 0, color: 3, shape: 'cross' }, r, r, r * 0.95, { theme, colorblind: false });
       break;
+    case 'ladybugs':
+      drawPiece(ctx, { kind: 'ladybug', id: 0, color: 0, spots: 3 }, r, r * 1.08, r * 0.78, { theme, colorblind: false });
+      break;
     case 'flood':
       ctx.fillStyle = config.water.fill[theme];
       ctx.beginPath();

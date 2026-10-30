@@ -97,7 +97,7 @@ function findLoop(s: GameState, group: number[]): number[] | null {
 /**
  * Cells worth clearing for reasons a plain "clear the most" search misses:
  * the cells under anchors (so they drop), next to ice (to crack it), and dry
- * cells next to active water (to spread it).
+ * cells next to active water (to spread it), and ladybugs themselves.
  */
 export function targetCells(s: GameState): Set<number> {
   const out = new Set<number>();
@@ -110,6 +110,7 @@ export function targetCells(s: GameState): Set<number> {
       for (let j = i + s.cols; j < s.cells.length; j += s.cols) if (s.cells[j]) out.add(j);
     }
     if (s.layers.ice[i] > 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
+    if (p?.kind === 'ladybug' && s.layers.ice[i] === 0) out.add(i);
   });
   return out;
 }
@@ -166,6 +167,8 @@ export function progressScore(before: GameState, after: GameState, startRemainin
     if (g.goal.type === 'anchors' && now > 0) score += 0.8 * share * anchorDescent(before, after);
     // Gems: credit for leaving a ready-made loop (a 2x2 square) in a color a gem is waiting for.
     if (g.goal.type === 'gems' && now > 0) score += 0.15 * share * (gemSquares(after) - gemSquares(before));
+    // Ladybugs: partial credit for each spot knocked off.
+    if (g.goal.type === 'ladybugs' && now > 0) score += 0.3 * share * (bugSpots(before) - bugSpots(after) - (was - now) );
     // Ice: partial credit for each layer knocked off.
     if (g.goal.type === 'ice' && now > 0) score += 0.3 * share * (iceLayers(before) - iceLayers(after));
   });
@@ -192,6 +195,8 @@ function gemSquares(s: GameState): number {
   for (const v of found.values()) n += v;
   return n;
 }
+
+const bugSpots = (s: GameState) => s.cells.reduce((n, p) => n + (p?.kind === 'ladybug' ? p.spots : 0), 0);
 
 const iceLayers = (s: GameState) => s.layers.ice.reduce((a, b) => a + b, 0);
 

@@ -24,6 +24,8 @@ export interface GenParams {
   ice?: { perSize: number; max: number; thickness: [number, number] };
   /** Gem goal: this many gems (a share of them cross gems) in the board's colors; set them all off. */
   gems?: { count: number; crossShare: number };
+  /** Ladybug goal: this many three-spot ladybugs; clear them all. */
+  ladybugs?: number;
   /** Flood goal: this many watered cells to start (mirrored), `underIce` of them frozen over. */
   water?: { sources: number; underIce?: number };
   /** The move limit should land in this range. */
@@ -134,6 +136,14 @@ function placePieces(p: GenParams, layout: string[], palette: ColorId[], rng: Rn
     out.push({ r, c, type: 'gem', color: palette[k % palette.length], shape });
     k++;
   }
+  for (let k = 0, guard = 0; k < (p.ladybugs ?? 0) && guard < 500; guard++) {
+    const r = rng.int(p.rows);
+    const c = rng.int(p.cols);
+    if (!free(r, c)) continue;
+    taken.add(r * p.cols + c);
+    out.push({ r, c, type: 'ladybug', color: palette[(k + 1) % palette.length] });
+    k++;
+  }
   return out;
 }
 
@@ -200,6 +210,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
     const iceCount = ice ? ice.join('').replace(/\./g, '').length : 0;
     if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
     if (p.gems?.count) goals.unshift({ type: 'gems', count: p.gems.count });
+    if (p.ladybugs) goals.unshift({ type: 'ladybugs', count: p.ladybugs });
     if (water) {
       goals.unshift({ type: 'flood' });
       // Freeze over some sources (hazards under ice).

@@ -7,7 +7,7 @@ import type { ColorId, GameState } from './types';
 export function connectableColor(s: GameState, i: number): ColorId | null {
   if (!isCell(s, i) || s.layers.ice[i] > 0) return null;
   const p = s.cells[i];
-  return p && p.kind === 'dot' ? p.color : null;
+  return p && (p.kind === 'dot' || p.kind === 'ladybug') ? p.color : null;
 }
 
 /** Can the line step from a to b? Same color, orthogonally adjacent, no wall between. */

@@ -1,0 +1,22 @@
+{
+  "seed": 342859,
+  "moves": 9,
+  "colors": [1, 3, 4],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "-....-",
+    "......"
+  ],
+  "pieces": [
+    { "r": 0, "c": 4, "type": "ladybug", "color": 4 },
+    { "r": 5, "c": 1, "type": "ladybug", "color": 1 }
+  ],
+  "goals": [
+    { "type": "ladybugs", "count": 2 }
+  ],
+  "stars": { "two": 6, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.84, "median": 7, "p10": 5 }
+}

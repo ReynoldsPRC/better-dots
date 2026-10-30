@@ -72,6 +72,11 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
           if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: gem color must be one of "colors"`);
           if (po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "column" or "cross"`);
           return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as 'column' | 'cross' };
+        case 'ladybug': {
+          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: ladybug color must be one of "colors"`);
+          if (po.spots !== undefined && !(isInt(po.spots) && po.spots >= 1 && po.spots <= 3)) fail(`piece ${k}: ladybug spots must be 1-3`);
+          return { r, c, type: 'ladybug', color: po.color as ColorId, ...(po.spots !== undefined ? { spots: po.spots as number } : {}) };
+        }
         default:
           return fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
       }
@@ -127,6 +132,12 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
         const have = (pieces ?? []).filter((p) => p.type === 'gem').length;
         if (count > have) fail(`goal ${k}: needs ${count} gems but the level only has ${have}`);
         return { type: 'gems', count };
+      }
+      case 'ladybugs': {
+        const count = positive(go.count, k);
+        const have = (pieces ?? []).filter((p) => p.type === 'ladybug').length;
+        if (count > have) fail(`goal ${k}: needs ${count} ladybugs but the level only has ${have}`);
+        return { type: 'ladybugs', count };
       }
       case 'ice': {
         const count = positive(go.count, k);

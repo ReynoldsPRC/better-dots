@@ -1,0 +1,23 @@
+{
+  "name": "Catch it",
+  "seed": 8001,
+  "moves": 7,
+  "colors": [1, 2, 4],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "pieces": [
+    { "r": 2, "c": 1, "type": "ladybug", "color": 4 },
+    { "r": 3, "c": 4, "type": "ladybug", "color": 1 }
+  ],
+  "goals": [
+    { "type": "ladybugs", "count": 2 }
+  ],
+  "stars": { "two": 5, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.83, "median": 6, "p10": 5 }
+}

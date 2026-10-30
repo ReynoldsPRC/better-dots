@@ -94,6 +94,16 @@ export const config = {
     beamAlpha: 0.55,
   },
 
+  ladybug: {
+    /** Ladybug size as a multiple of dot radius. */
+    scale: 1.15,
+    /** Flight time, and how high (in cells) the flight arcs. */
+    flyMs: 420,
+    arc: 0.6,
+    /** Head and spot color. */
+    ink: { light: '#2E2B28', dark: '#1A1917' },
+  },
+
   water: {
     /** Watered-cell tile, light and dark themes. Kept paler and greener than the slate dot. */
     fill: { light: '#A9D3D6', dark: '#2F5A60' },

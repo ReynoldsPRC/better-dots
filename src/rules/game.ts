@@ -47,9 +47,10 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   for (const p of level.pieces ?? []) {
     const i = p.r * cols + p.c;
     if (!playable[i]) throw new Error(`level ${level.id}: piece at row ${p.r}, col ${p.c} is not on a cell`);
-    cells[i] = p.type === 'anchor'
-      ? { kind: 'anchor', id: nextId++ }
-      : { kind: 'gem', id: nextId++, color: p.color, shape: p.shape };
+    cells[i] =
+      p.type === 'anchor' ? { kind: 'anchor', id: nextId++ } :
+      p.type === 'gem' ? { kind: 'gem', id: nextId++, color: p.color, shape: p.shape } :
+      { kind: 'ladybug', id: nextId++, color: p.color, spots: p.spots ?? 3 };
   }
 
   const { wallRight, wallDown } = placeWalls(level, rows, cols);
@@ -192,7 +193,13 @@ class Move {
   anchorDrops: number;
   readonly layers: Layers;
   readonly events: MoveEvent[] = [];
-  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0, gems: 0 };
+  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0, gems: 0, ladybugs: 0 };
+  /** Ladybugs already hit this move (by id): each loses at most one spot per move. */
+  private readonly bugsHit = new Set<number>();
+  /** Ladybugs that lost a spot and will fly once the cascade settles. */
+  private readonly toFly = new Set<number>();
+  /** Bomb cells this wave: a ladybug there is removed whatever its spots. */
+  private bombCells = new Set<number>();
   /** Gems already set off this move (by piece id), so each goes off once. */
   private readonly triggered = new Set<number>();
   /** Gems set off during the current blast wave; they fire in the next. */
@@ -226,10 +233,49 @@ class Move {
   clear(i: number): boolean {
     const p = this.cells[i];
     if (!p || p.kind === 'anchor' || this.layers.ice[i] > 0) return false;
+    if (p.kind === 'ladybug') return this.hitLadybug(i, p);
     this.cells[i] = null;
     this.cleared.add(i);
     if (p.kind === 'dot') this.tally.collected[p.color]++;
     return true;
+  }
+
+  /**
+   * A ladybug loses a spot and changes color (it flies later), or is removed
+   * on its last spot or when it's a bomb. The cell counts as cleared either way.
+   * Returns true if it was removed.
+   */
+  private hitLadybug(i: number, p: Extract<Piece, { kind: 'ladybug' }>): boolean {
+    if (this.bugsHit.has(p.id)) return false;
+    this.bugsHit.add(p.id);
+    this.cleared.add(i);
+    if (p.spots <= 1 || this.bombCells.has(i)) {
+      this.cells[i] = null;
+      this.tally.ladybugs++;
+      return true;
+    }
+    const others = this.s.colors.filter((c) => c !== p.color);
+    const color = others.length > 0 ? this.rng.pick(others) : p.color;
+    this.cells[i] = { ...p, spots: p.spots - 1, color };
+    this.toFly.add(p.id);
+    return false;
+  }
+
+  /** Ladybugs that lost a spot fly to random cells, swapping with the dots there. */
+  fly(): void {
+    if (this.toFly.size === 0) return;
+    const moves: { from: number; to: number }[] = [];
+    // Fly each once, in board order as of now (a ladybug can land on a later cell).
+    const flying = this.cells.flatMap((p) => (p?.kind === 'ladybug' && this.toFly.has(p.id) ? [p.id] : []));
+    for (const id of flying) {
+      const i = this.cells.findIndex((p) => p?.id === id);
+      const spots = this.cells.flatMap((q, j) => (q?.kind === 'dot' && this.layers.ice[j] === 0 && j !== i ? [j] : []));
+      if (spots.length === 0) continue;
+      const to = this.rng.pick(spots);
+      [this.cells[i], this.cells[to]] = [this.cells[to], this.cells[i]];
+      moves.push({ from: i, to });
+    }
+    if (moves.length > 0) this.emit({ kind: 'fly', moves });
   }
 
   /** Sets off the gem at i (if there is one, unfrozen and not yet set off). */
@@ -310,9 +356,12 @@ class Move {
     const s = this.s;
     const view = this.view();
     const first = loop ? this.cells.flatMap((_, i) => (connectableColor(view, i) === color ? [i] : [])) : path;
-    // Dots enclosed by a loop that aren't its color become bombs (frozen ones are protected).
+    // Dots and ladybugs enclosed by a loop that aren't its color become bombs (frozen ones are protected).
     const bombs = loop
-      ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && this.layers.ice[i] === 0 && !first.includes(i))
+      ? enclosedCells(s, path).filter((i) => {
+          const k = this.cells[i]?.kind;
+          return (k === 'dot' || k === 'ladybug') && this.layers.ice[i] === 0 && !first.includes(i);
+        })
       : [];
     // A loop sets off every gem of its color; they fire with the bombs.
     const gems = loop
@@ -326,6 +375,7 @@ class Move {
       const hit = new Set<number>();
       for (const src of sources) for (const j of this.reach(src)) hit.add(j);
       this.nextWave = [];
+      this.bombCells = new Set(sources.filter((x) => x.type === 'bomb').map((x) => x.cell));
       this.stage('blast', hit, sources);
       sources = this.nextWave.sort((a, b) => a.cell - b.cell);
     }
@@ -440,6 +490,8 @@ function progressFor(g: GoalState, t: Tally): number {
       return 0;
     case 'gems':
       return t.gems;
+    case 'ladybugs':
+      return t.ladybugs;
   }
 }
 
@@ -453,6 +505,7 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   const m = new Move(s);
   m.cascade(path, color, loop);
   m.react();
+  m.fly();
   m.settle();
   const settled = m.cells.slice();
 

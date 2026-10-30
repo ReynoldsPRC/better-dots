@@ -254,7 +254,42 @@ export function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number
       return drawAnchor(ctx, x, y, r, config.ink[opts.theme]);
     case 'gem':
       return drawGem(ctx, x, y, r, piece.color, piece.shape === 'cross', opts);
+    case 'ladybug':
+      return drawLadybug(ctx, x, y, r, piece.color, piece.spots, opts);
   }
+}
+
+/**
+ * A ladybug: a shell in its current color with a dark head, a seam down the
+ * back, and one dark spot per remaining spot.
+ */
+function drawLadybug(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, spots: number, opts: DrawOptions) {
+  const s = r * config.ladybug.scale;
+  const ink = config.ladybug.ink[opts.theme];
+  ctx.save();
+  ctx.fillStyle = ink;
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.78, s * 0.42, Math.PI, 0);
+  ctx.fill();
+  ctx.fillStyle = colorOf(opts.theme, color);
+  ctx.beginPath();
+  ctx.ellipse(x, y + s * 0.08, s * 0.9, s * 0.92, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = s * 0.08;
+  ctx.beginPath();
+  ctx.moveTo(x, y - s * 0.82);
+  ctx.lineTo(x, y + s * 0.98);
+  ctx.stroke();
+  ctx.fillStyle = ink;
+  const at: [number, number][] = spots >= 3 ? [[-0.42, -0.2], [0.42, -0.2], [0, 0.48]] : spots === 2 ? [[-0.42, 0.12], [0.42, 0.12]] : [[0, 0.3]];
+  for (const [dx, dy] of at) {
+    ctx.beginPath();
+    ctx.arc(x + dx * s + (dx === 0 ? s * 0.32 : 0), y + dy * s, s * 0.17, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  if (opts.colorblind) drawSymbol(ctx, x - s * 0.42, y + s * 0.5, s * 0.26, color, config.background[opts.theme]);
 }
 
 /**

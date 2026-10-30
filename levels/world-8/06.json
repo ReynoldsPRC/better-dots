@@ -1,0 +1,29 @@
+{
+  "seed": 306896,
+  "moves": 18,
+  "colors": [0, 1, 2, 4],
+  "layout": [
+    ".......",
+    "-.....-",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    "......."
+  ],
+  "walls": [
+    { "r": 2, "c": 2, "side": "right" },
+    { "r": 2, "c": 3, "side": "right" }
+  ],
+  "pieces": [
+    { "r": 4, "c": 2, "type": "ladybug", "color": 2 },
+    { "r": 1, "c": 3, "type": "ladybug", "color": 4 },
+    { "r": 6, "c": 3, "type": "ladybug", "color": 1 }
+  ],
+  "goals": [
+    { "type": "ladybugs", "count": 3 },
+    { "type": "collect", "color": 4, "count": 12 }
+  ],
+  "stars": { "two": 13, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 14, "p10": 11 }
+}

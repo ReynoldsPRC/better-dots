@@ -33,7 +33,19 @@ export interface Gem {
   shape: GemShape;
 }
 
-export type Piece = Dot | Anchor | Gem;
+/**
+ * Connectable like a dot of its current color. Each clear costs a spot; with
+ * spots left it changes color and flies to a random cell. Cleared on its last
+ * spot, or at once if a loop encloses it.
+ */
+export interface Ladybug {
+  kind: 'ladybug';
+  id: number;
+  color: ColorId;
+  spots: number;
+}
+
+export type Piece = Dot | Anchor | Gem | Ladybug;
 export type Cells = (Piece | null)[];
 
 /** A wall on one side of cell (r, c). */
@@ -46,7 +58,8 @@ export interface Wall {
 /** A piece placed by the level file (dots go in the layout instead). */
 export type PlacedPiece =
   | { r: number; c: number; type: 'anchor' }
-  | { r: number; c: number; type: 'gem'; color: ColorId; shape: GemShape };
+  | { r: number; c: number; type: 'gem'; color: ColorId; shape: GemShape }
+  | { r: number; c: number; type: 'ladybug'; color: ColorId; spots?: number };
 
 export type Goal =
   | { type: 'collect'; color: ColorId; count: number }
@@ -54,7 +67,8 @@ export type Goal =
   | { type: 'ice'; count: number }
   /** Water every cell. */
   | { type: 'flood' }
-  | { type: 'gems'; count: number };
+  | { type: 'gems'; count: number }
+  | { type: 'ladybugs'; count: number };
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
@@ -134,6 +148,8 @@ export interface Tally {
   ice: number;
   /** Gems set off. */
   gems: number;
+  /** Ladybugs removed. */
+  ladybugs: number;
 }
 
 export type ClearKind = 'line' | 'loop' | 'blast';
@@ -164,6 +180,8 @@ export type MoveEvent = { board: Cells } & (
   | { kind: 'fall'; spawnFrom: Record<number, number> }
   /** Anchors that reached the bottom and were removed. */
   | { kind: 'sink'; cells: number[] }
+  /** Ladybugs flying off after a hit, each swapping places with the dot where it lands. */
+  | { kind: 'fly'; moves: { from: number; to: number }[] }
   /** Cell layers changed (ice cracked, ...). `layers` is the new state; `cells` are the ones that changed. */
   | { kind: 'layers'; layers: Layers; cells: number[] }
   | { kind: 'shuffle' }

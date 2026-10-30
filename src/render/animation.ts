@@ -100,6 +100,9 @@ export class MoveAnimation {
         case 'layers':
           seg.dur = config.ice.crackMs;
           break;
+        case 'fly':
+          seg.dur = config.ladybug.flyMs;
+          break;
         case 'shuffle':
           seg.dur = config.shuffle.delayMs + config.shuffle.moveMs;
           break;
@@ -198,6 +201,26 @@ export class MoveAnimation {
       }
       case 'layers':
         return this.still(event.board);
+      case 'fly': {
+        // Each ladybug arcs to its new cell; the dot it lands on slides over to where the ladybug was.
+        const p = ease('easeInOutQuad', lt / config.ladybug.flyMs);
+        const moving = new Map<number, { from: number; to: number; lift: number }>();
+        for (const m of event.moves) {
+          const bug = event.board[m.to];
+          const dot = event.board[m.from];
+          if (bug) moving.set(bug.id, { from: m.from, to: m.to, lift: config.ladybug.arc });
+          if (dot) moving.set(dot.id, { from: m.to, to: m.from, lift: 0 });
+        }
+        return event.board.flatMap((piece, i) => {
+          if (!piece) return [];
+          const mv = moving.get(piece.id);
+          if (!mv) return [{ id: piece.id, piece, r: Math.floor(i / cols), c: i % cols, scale: 1, alpha: 1 }];
+          const [r0, c0] = [Math.floor(mv.from / cols), mv.from % cols];
+          const [r1, c1] = [Math.floor(mv.to / cols), mv.to % cols];
+          const r = r0 + (r1 - r0) * p - mv.lift * Math.sin(Math.PI * p);
+          return [{ id: piece.id, piece, r, c: c0 + (c1 - c0) * p, scale: 1 + (mv.lift ? 0.25 * Math.sin(Math.PI * p) : 0), alpha: 1 }];
+        });
+      }
       case 'shuffle': {
         const from = positions(before, cols);
         const p = ease('easeInOutQuad', (lt - config.shuffle.delayMs) / config.shuffle.moveMs);

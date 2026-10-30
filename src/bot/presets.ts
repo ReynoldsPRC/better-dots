@@ -46,4 +46,10 @@ export const presets: Record<number, Preset> = {
     collectGoals: t < 0.3 ? 0 : 1, gems: { count: lerp(2, 6, t), crossShare: 0.35 },
     targetMoves: [lerp(6, 18, t), lerp(14, 30, t)],
   }),
+  // World 8: ladybugs.
+  8: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: lerp(3, 5, t), holes: lerp(0, 4, t), walls: lerp(0, 2, t),
+    collectGoals: t < 0.4 ? 0 : 1, ladybugs: lerp(1, 4, t),
+    targetMoves: [lerp(4, 16, t), lerp(12, 30, t)],
+  }),
 };
