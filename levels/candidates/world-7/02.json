@@ -1,0 +1,22 @@
+{
+  "seed": 426376,
+  "moves": 6,
+  "colors": [0, 3, 4],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "pieces": [
+    { "r": 2, "c": 1, "type": "gem", "color": 4, "shape": "cross" },
+    { "r": 1, "c": 5, "type": "gem", "color": 3, "shape": "column" }
+  ],
+  "goals": [
+    { "type": "gems", "count": 2 }
+  ],
+  "stars": { "two": 4, "three": 3 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 5, "p10": 3 }
+}

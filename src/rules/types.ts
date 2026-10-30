@@ -19,7 +19,21 @@ export interface Anchor {
   id: number;
 }
 
-export type Piece = Dot | Anchor;
+export type GemShape = 'column' | 'cross';
+
+/**
+ * Not connectable; falls. Goes off when a loop of its color is made, or when
+ * a blast or beam reaches it: a column gem clears its column, a cross gem its
+ * row and column.
+ */
+export interface Gem {
+  kind: 'gem';
+  id: number;
+  color: ColorId;
+  shape: GemShape;
+}
+
+export type Piece = Dot | Anchor | Gem;
 export type Cells = (Piece | null)[];
 
 /** A wall on one side of cell (r, c). */
@@ -30,14 +44,17 @@ export interface Wall {
 }
 
 /** A piece placed by the level file (dots go in the layout instead). */
-export type PlacedPiece = { r: number; c: number; type: 'anchor' };
+export type PlacedPiece =
+  | { r: number; c: number; type: 'anchor' }
+  | { r: number; c: number; type: 'gem'; color: ColorId; shape: GemShape };
 
 export type Goal =
   | { type: 'collect'; color: ColorId; count: number }
   | { type: 'anchors'; count: number }
   | { type: 'ice'; count: number }
   /** Water every cell. */
-  | { type: 'flood' };
+  | { type: 'flood' }
+  | { type: 'gems'; count: number };
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
@@ -115,18 +132,26 @@ export interface Tally {
   anchors: number;
   /** Ice cells broken all the way through. */
   ice: number;
+  /** Gems set off. */
+  gems: number;
 }
 
 export type ClearKind = 'line' | 'loop' | 'blast';
-export type BlastType = 'bomb';
+export type BlastType = 'bomb' | GemShape;
+
+export interface BlastSource {
+  cell: number;
+  type: BlastType;
+  color?: ColorId;
+}
 
 /** One stage of a move's cascade. Stages resolve (and animate) in order. */
 export interface ClearStep {
   kind: ClearKind;
   /** Cells whose pieces were removed in this stage, ascending. */
   cells: number[];
-  /** What went off in a blast stage (empty for line and loop). */
-  sources: { cell: number; type: BlastType }[];
+  /** What went off in a blast stage (empty for line and loop). Gems carry their color. */
+  sources: BlastSource[];
 }
 
 /**

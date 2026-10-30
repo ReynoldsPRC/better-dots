@@ -42,6 +42,7 @@ Non-negotiable. Don't add any of these, even as an option:
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
 - Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`) and `anchorDrops` (how many more anchors drop in). A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than the level started with (at least one), until drops run out. Anchor goals: `{ "type": "anchors", "count" }`.
 - Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
+- Gems are placed with `pieces`: `{ "r", "c", "type": "gem", "color", "shape": "column" | "cross" }`. Gem goal: `{ "type": "gems", "count" }`.
 - Level files may have `water` (a grid: `.` dry, `x` watered). Flood goal: `{ "type": "flood" }`. Water under ice is dormant: it doesn't spread until the ice breaks, and a move that breaks the ice doesn't flood from it (the water was still frozen while that move's cells cleared).
 - `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). Level ids are `N-NN` from that position. `src/levels.ts` bundles them at build time; `tests/level.test.ts` checks every shipped file. Level file fields: `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot, `-` no cell), `walls` (optional list of `{ "r", "c", "side": "up" | "down" | "left" | "right" }`, each between two cells), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
 - `src/progress.ts`: save format and unlock/star bookkeeping (pure). `src/ui/storage.ts`: localStorage key `better-dots-save`, export/import as a JSON file from Settings. Developer switch: Settings toggle, or `?dev` in the URL.
@@ -117,6 +118,7 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 - **Column gem** (rectangular): its beam clears its whole column.
 - **Cross gem** (square): its beams clear its row and its column.
 - A beam passing through another gem triggers that gem, so cascades are possible.
+- Cascades resolve in waves: everything set off together fires together (bombs and loop-triggered gems first); gems a wave reaches fire in the next wave. Bombs set off gems too. Beams cross walls and skip anchors; frozen gems are protected (their ice cracks instead). Each gem fires once and is removed when it fires.
 - Goal option: trigger N gems.
 
 ### Ladybugs

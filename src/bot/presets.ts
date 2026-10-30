@@ -40,4 +40,10 @@ export const presets: Record<number, Preset> = {
     collectGoals: 0, water: { sources: lerp(1, 4, t), underIce: t > 0.6 ? 2 : 0 },
     targetMoves: [lerp(6, 18, t), lerp(16, 34, t)],
   }),
+  // World 7: gems.
+  7: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: t < 0.2 ? 3 : t < 0.85 ? 4 : 5, holes: lerp(0, 4, t),
+    collectGoals: t < 0.3 ? 0 : 1, gems: { count: lerp(2, 6, t), crossShare: 0.35 },
+    targetMoves: [lerp(6, 18, t), lerp(14, 30, t)],
+  }),
 };

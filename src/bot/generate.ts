@@ -22,6 +22,8 @@ export interface GenParams {
    * in the given range; the goal is to break it all.
    */
   ice?: { perSize: number; max: number; thickness: [number, number] };
+  /** Gem goal: this many gems (a share of them cross gems) in the board's colors; set them all off. */
+  gems?: { count: number; crossShare: number };
   /** Flood goal: this many watered cells to start (mirrored), `underIce` of them frozen over. */
   water?: { sources: number; underIce?: number };
   /** The move limit should land in this range. */
@@ -110,16 +112,27 @@ function makeWalls(p: GenParams, layout: string[], rng: Rng): Wall[] {
 }
 
 /** Places the level's starting pieces (anchors in the top rows, away from the bottom). */
-function placePieces(p: GenParams, layout: string[], rng: Rng): PlacedPiece[] {
+function placePieces(p: GenParams, layout: string[], palette: ColorId[], rng: Rng): PlacedPiece[] {
   const out: PlacedPiece[] = [];
   const taken = new Set<number>();
-  const want = p.anchors?.start ?? 0;
-  for (let guard = 0; out.length < want && guard < 500; guard++) {
+  const free = (r: number, c: number) => layout[r][c] !== '-' && !taken.has(r * p.cols + c);
+  const anchors = p.anchors?.start ?? 0;
+  for (let guard = 0; out.length < anchors && guard < 500; guard++) {
     const r = rng.int(Math.max(1, Math.floor(p.rows / 2)));
     const c = rng.int(p.cols);
-    if (layout[r][c] === '-' || taken.has(r * p.cols + c)) continue;
+    if (!free(r, c)) continue;
     taken.add(r * p.cols + c);
     out.push({ r, c, type: 'anchor' });
+  }
+  const gems = p.gems?.count ?? 0;
+  for (let k = 0, guard = 0; k < gems && guard < 500; guard++) {
+    const r = rng.int(p.rows);
+    const c = rng.int(p.cols);
+    if (!free(r, c)) continue;
+    taken.add(r * p.cols + c);
+    const shape = rng.float() < p.gems!.crossShare ? 'cross' : 'column';
+    out.push({ r, c, type: 'gem', color: palette[k % palette.length], shape });
+    k++;
   }
   return out;
 }
@@ -177,7 +190,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const walls = makeWalls(p, layout, rng);
   const goalColors = rng.shuffle(palette).slice(0, p.collectGoals).sort((a, b) => a - b);
   const runs = p.runs ?? 40;
-  const pieces = placePieces(p, layout, rng);
+  const pieces = placePieces(p, layout, rng.shuffle(palette), rng);
   const iceSeed = rng.int(1_000_000);
   const { water, waterIce } = placeWater(p, layout, rng);
 
@@ -186,6 +199,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
     let ice = p.ice ? placeIce(p, layout, Math.min(p.ice.max, Math.round(count * p.ice.perSize)), new Rng(seedRng(iceSeed))) : undefined;
     const iceCount = ice ? ice.join('').replace(/\./g, '').length : 0;
     if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
+    if (p.gems?.count) goals.unshift({ type: 'gems', count: p.gems.count });
     if (water) {
       goals.unshift({ type: 'flood' });
       // Freeze over some sources (hazards under ice).

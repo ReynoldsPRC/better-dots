@@ -86,6 +86,14 @@ export const config = {
     crackMs: 220,
   },
 
+  gem: {
+    /** Gem size as a multiple of dot radius. */
+    scale: 1.3,
+    /** Beam width (fraction of cell) and peak alpha. */
+    beamWidth: 0.7,
+    beamAlpha: 0.55,
+  },
+
   water: {
     /** Watered-cell tile, light and dark themes. Kept paler and greener than the slate dot. */
     fill: { light: '#A9D3D6', dark: '#2F5A60' },

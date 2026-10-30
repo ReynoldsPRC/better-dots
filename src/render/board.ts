@@ -74,6 +74,16 @@ export function drawScene(
     ctx.stroke();
   }
 
+  // Gem beams, under the dots: a band along the column (and row, for cross gems) that narrows as it fades.
+  for (const b of frame?.blasts ?? []) {
+    if (b.type === 'bomb') continue;
+    const [x, y] = toScreen(layout, b.r, b.c);
+    const w = cell * config.gem.beamWidth * (1 - 0.6 * b.progress);
+    ctx.fillStyle = withAlpha(colorOf(theme, b.color ?? 0), config.gem.beamAlpha * (1 - b.progress));
+    ctx.fillRect(x - w / 2, layout.y0, w, layout.rows * cell);
+    if (b.type === 'cross') ctx.fillRect(layout.x0, y - w / 2, layout.cols * cell, w);
+  }
+
   // Dots. New dots slide in from above the board, so clip to its top edge.
   ctx.save();
   ctx.beginPath();
@@ -110,6 +120,7 @@ export function drawScene(
 
   for (const b of frame?.blasts ?? []) {
     const [x, y] = toScreen(layout, b.r, b.c);
+    if (b.type !== 'bomb') continue;
     ctx.strokeStyle = withAlpha(config.ink[theme], 0.5 * (1 - b.progress));
     ctx.lineWidth = cell * 0.08;
     ctx.beginPath();
@@ -241,6 +252,47 @@ export function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number
       return drawDot(ctx, x, y, r, piece.color, opts);
     case 'anchor':
       return drawAnchor(ctx, x, y, r, config.ink[opts.theme]);
+    case 'gem':
+      return drawGem(ctx, x, y, r, piece.color, piece.shape === 'cross', opts);
+  }
+}
+
+/**
+ * Gems: a tall bar (column gem) or a square (cross gem) in the gem's color,
+ * with a pale inset and an etched line or cross showing which way it fires.
+ */
+function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, cross: boolean, opts: DrawOptions) {
+  const s = r * config.gem.scale;
+  const w = cross ? s * 1.6 : s * 1.1;
+  const h = s * 1.6;
+  ctx.save();
+  ctx.fillStyle = colorOf(opts.theme, color);
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2, y - h / 2, w, h, s * 0.28);
+  ctx.fill();
+  ctx.fillStyle = withAlpha('#FFFFFF', 0.28);
+  ctx.beginPath();
+  ctx.roundRect(x - w / 2 + s * 0.18, y - h / 2 + s * 0.18, w - s * 0.36, h - s * 0.36, s * 0.16);
+  ctx.fill();
+  ctx.strokeStyle = withAlpha('#FFFFFF', 0.85);
+  ctx.lineWidth = s * 0.14;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y - h / 2 + s * 0.3);
+  ctx.lineTo(x, y + h / 2 - s * 0.3);
+  if (cross) {
+    ctx.moveTo(x - w / 2 + s * 0.3, y);
+    ctx.lineTo(x + w / 2 - s * 0.3, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+  if (opts.colorblind) {
+    // Symbol in a small disc so it reads over the etched line.
+    ctx.fillStyle = colorOf(opts.theme, color);
+    ctx.beginPath();
+    ctx.arc(x, y, s * 0.42, 0, Math.PI * 2);
+    ctx.fill();
+    drawSymbol(ctx, x, y, s * 0.3, color, config.background[opts.theme]);
   }
 }
 

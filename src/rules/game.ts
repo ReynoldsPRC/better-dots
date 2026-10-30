@@ -5,7 +5,7 @@ import { canCross, cellsAround, toIndex } from './board';
 import { connectableColor, enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
 import type {
-  BlastType, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, Tally,
+  BlastSource, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, Tally,
 } from './types';
 
 export interface GameOptions {
@@ -47,7 +47,9 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   for (const p of level.pieces ?? []) {
     const i = p.r * cols + p.c;
     if (!playable[i]) throw new Error(`level ${level.id}: piece at row ${p.r}, col ${p.c} is not on a cell`);
-    cells[i] = { kind: 'anchor', id: nextId++ };
+    cells[i] = p.type === 'anchor'
+      ? { kind: 'anchor', id: nextId++ }
+      : { kind: 'gem', id: nextId++, color: p.color, shape: p.shape };
   }
 
   const { wallRight, wallDown } = placeWalls(level, rows, cols);
@@ -190,7 +192,11 @@ class Move {
   anchorDrops: number;
   readonly layers: Layers;
   readonly events: MoveEvent[] = [];
-  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0 };
+  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0, gems: 0 };
+  /** Gems already set off this move (by piece id), so each goes off once. */
+  private readonly triggered = new Set<number>();
+  /** Gems set off during the current blast wave; they fire in the next. */
+  private nextWave: BlastSource[] = [];
   /** Cells whose piece was cleared this move (ice, water, fire, and slime react to these). */
   readonly cleared = new Set<number>();
   /** Cells a blast reached, cleared or not. */
@@ -222,15 +228,42 @@ class Move {
     if (!p || p.kind === 'anchor' || this.layers.ice[i] > 0) return false;
     this.cells[i] = null;
     this.cleared.add(i);
-    this.tally.collected[p.color]++;
+    if (p.kind === 'dot') this.tally.collected[p.color]++;
     return true;
+  }
+
+  /** Sets off the gem at i (if there is one, unfrozen and not yet set off). */
+  private trigger(i: number): BlastSource | null {
+    const p = this.cells[i];
+    if (p?.kind !== 'gem' || this.layers.ice[i] > 0 || this.triggered.has(p.id)) return null;
+    this.triggered.add(p.id);
+    this.tally.gems++;
+    return { cell: i, type: p.shape, color: p.color };
   }
 
   stage(kind: ClearKind, cells: Iterable<number>, sources: ClearStep['sources'] = []): void {
     const all = [...new Set(cells)].sort((a, b) => a - b);
-    if (kind === 'blast') for (const i of all) this.blasted.add(i);
+    if (kind === 'blast') {
+      for (const i of all) {
+        this.blasted.add(i);
+        const src = this.trigger(i);
+        if (src) this.nextWave.push(src);
+      }
+    }
     const removed = all.filter((i) => this.clear(i));
     this.emit({ kind: 'clear', step: { kind, cells: removed, sources } });
+  }
+
+  /** Cells a blast source reaches, including its own. Walls don't stop blasts or beams. */
+  private reach(src: BlastSource): number[] {
+    const s = this.s;
+    const r = Math.floor(src.cell / s.cols);
+    const c = src.cell % s.cols;
+    if (src.type === 'bomb') return [src.cell, ...cellsAround(s, src.cell, s.bombRadius)];
+    const out: number[] = [];
+    for (let rr = 0; rr < s.rows; rr++) out.push(rr * s.cols + c);
+    if (src.type === 'cross') for (let cc = 0; cc < s.cols; cc++) out.push(r * s.cols + cc);
+    return out.filter((i) => s.playable[i]);
   }
 
   /**
@@ -281,17 +314,20 @@ class Move {
     const bombs = loop
       ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && this.layers.ice[i] === 0 && !first.includes(i))
       : [];
+    // A loop sets off every gem of its color; they fire with the bombs.
+    const gems = loop
+      ? this.cells.flatMap((p, i) => (p?.kind === 'gem' && p.color === color ? [this.trigger(i)!].filter(Boolean) : []))
+      : [];
     this.stage(loop ? 'loop' : 'line', first);
 
-    let sources: { cell: number; type: BlastType }[] = bombs.map((cell) => ({ cell, type: 'bomb' }));
+    // Each wave fires together; gems a wave reaches fire in the next one.
+    let sources: BlastSource[] = [...bombs.map((cell): BlastSource => ({ cell, type: 'bomb' })), ...gems].sort((a, b) => a.cell - b.cell);
     while (sources.length > 0) {
       const hit = new Set<number>();
-      for (const src of sources) {
-        hit.add(src.cell);
-        for (const j of cellsAround(s, src.cell, s.bombRadius)) hit.add(j);
-      }
+      for (const src of sources) for (const j of this.reach(src)) hit.add(j);
+      this.nextWave = [];
       this.stage('blast', hit, sources);
-      sources = [];
+      sources = this.nextWave.sort((a, b) => a.cell - b.cell);
     }
   }
 
@@ -402,6 +438,8 @@ function progressFor(g: GoalState, t: Tally): number {
       return t.ice;
     case 'flood':
       return 0;
+    case 'gems':
+      return t.gems;
   }
 }
 

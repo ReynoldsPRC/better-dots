@@ -63,8 +63,18 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
       const at = `${po.r},${po.c}`;
       if (taken.has(at)) fail(`piece ${k}: another piece is already at row ${po.r}, col ${po.c}`);
       taken.add(at);
-      if (po.type !== 'anchor') fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
-      return { r: po.r as number, c: po.c as number, type: 'anchor' };
+      const r = po.r as number;
+      const c = po.c as number;
+      switch (po.type) {
+        case 'anchor':
+          return { r, c, type: 'anchor' };
+        case 'gem':
+          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: gem color must be one of "colors"`);
+          if (po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "column" or "cross"`);
+          return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as 'column' | 'cross' };
+        default:
+          return fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
+      }
     });
   }
   const startAnchors = (pieces ?? []).filter((p) => p.type === 'anchor').length;
@@ -112,6 +122,12 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
       case 'flood':
         if (!water) fail(`goal ${k}: a flood goal needs some starting "water"`);
         return { type: 'flood' };
+      case 'gems': {
+        const count = positive(go.count, k);
+        const have = (pieces ?? []).filter((p) => p.type === 'gem').length;
+        if (count > have) fail(`goal ${k}: needs ${count} gems but the level only has ${have}`);
+        return { type: 'gems', count };
+      }
       case 'ice': {
         const count = positive(go.count, k);
         if (count > iceCells) fail(`goal ${k}: needs ${count} ice but the level only has ${iceCells}`);

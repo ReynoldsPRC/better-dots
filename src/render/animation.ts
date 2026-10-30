@@ -19,7 +19,7 @@ export interface Frame {
   /** Board-wide loop pulse. */
   pulse: { color: ColorId; alpha: number } | null;
   /** Expanding rings where bombs go off; progress runs 0..1. */
-  blasts: { r: number; c: number; type: BlastType; progress: number }[];
+  blasts: { r: number; c: number; type: BlastType; color?: ColorId; progress: number }[];
   /** Cell layers as of this moment. */
   layers: Layers;
   /** Cells whose layers just changed, which layer, and 0..1 progress, for a brief effect. */
@@ -142,7 +142,7 @@ export class MoveAnimation {
       }
       if (step.kind === 'blast' && lt < config.bomb.explodeMs) {
         for (const src of step.sources) {
-          blasts.push({ r: Math.floor(src.cell / this.cols), c: src.cell % this.cols, type: src.type, progress: lt / config.bomb.explodeMs });
+          blasts.push({ r: Math.floor(src.cell / this.cols), c: src.cell % this.cols, type: src.type, color: src.color, progress: lt / config.bomb.explodeMs });
         }
       }
     }

@@ -4,7 +4,7 @@
 // goal progress, and picks the best with a little noise.
 // Pure and seeded like the rules, so runs are reproducible.
 import {
-  applyMove, canLink, createGame, goalRemaining, Rng, seedRng,
+  applyMove, canLink, connectableColor, createGame, goalRemaining, Rng, seedRng,
   type GameState, type LevelDef,
 } from '../rules';
 
@@ -164,10 +164,33 @@ export function progressScore(before: GameState, after: GameState, startRemainin
     score += (was - now) * share;
     // Anchors: reward moving them down, a fraction of what sinking one is worth.
     if (g.goal.type === 'anchors' && now > 0) score += 0.8 * share * anchorDescent(before, after);
+    // Gems: credit for leaving a ready-made loop (a 2x2 square) in a color a gem is waiting for.
+    if (g.goal.type === 'gems' && now > 0) score += 0.15 * share * (gemSquares(after) - gemSquares(before));
     // Ice: partial credit for each layer knocked off.
     if (g.goal.type === 'ice' && now > 0) score += 0.3 * share * (iceLayers(before) - iceLayers(after));
   });
   return score;
+}
+
+/** 2x2 same-color squares in colors that some gem on the board needs (capped so one color can't dominate). */
+function gemSquares(s: GameState): number {
+  const want = new Set<number>();
+  for (const p of s.cells) if (p?.kind === 'gem') want.add(p.color);
+  if (want.size === 0) return 0;
+  const found = new Map<number, number>();
+  for (let r = 0; r + 1 < s.rows; r++) {
+    for (let c = 0; c + 1 < s.cols; c++) {
+      const a = r * s.cols + c;
+      const col = connectableColor(s, a);
+      if (col === null || !want.has(col)) continue;
+      if (canLink(s, a, a + 1) && canLink(s, a + 1, a + s.cols + 1) && canLink(s, a + s.cols + 1, a + s.cols) && canLink(s, a + s.cols, a)) {
+        found.set(col, Math.min(2, (found.get(col) ?? 0) + 1));
+      }
+    }
+  }
+  let n = 0;
+  for (const v of found.values()) n += v;
+  return n;
 }
 
 const iceLayers = (s: GameState) => s.layers.ice.reduce((a, b) => a + b, 0);

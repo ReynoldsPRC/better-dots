@@ -1,0 +1,27 @@
+{
+  "seed": 270793,
+  "moves": 21,
+  "colors": [1, 2, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".-...-.",
+    ".-...-."
+  ],
+  "pieces": [
+    { "r": 2, "c": 5, "type": "gem", "color": 2, "shape": "column" },
+    { "r": 3, "c": 3, "type": "gem", "color": 3, "shape": "cross" },
+    { "r": 0, "c": 2, "type": "gem", "color": 1, "shape": "column" },
+    { "r": 4, "c": 2, "type": "gem", "color": 4, "shape": "column" },
+    { "r": 5, "c": 4, "type": "gem", "color": 2, "shape": "cross" }
+  ],
+  "goals": [
+    { "type": "gems", "count": 5 },
+    { "type": "collect", "color": 3, "count": 9 }
+  ],
+  "stars": { "two": 12, "three": 7 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 13, "p10": 7 }
+}
