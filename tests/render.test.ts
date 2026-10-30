@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { config } from '../src/config';
 import { MoveAnimation } from '../src/render/animation';
 import { cellAt, computeLayout, toScreen } from '../src/render/layout';
-import { applyMove } from '../src/rules';
+import { applyMove, createGame, hasMove, type GameState, type LevelDef } from '../src/rules';
 import { at, cells, game } from './helpers';
 
 describe('layout and hit-testing', () => {
@@ -72,5 +72,43 @@ describe('move animation timeline', () => {
     expect(anim.frame(config.cascade.stepMs + 1).blasts).toEqual([
       expect.objectContaining({ r: 1, c: 1 }),
     ]);
+  });
+
+  it('input opens when the dots land, before the settle bounce; the HUD changes once the dots have popped', () => {
+    const s = game(BOARD);
+    const { state, result } = applyMove(s, cells(s, [1, 0], [1, 1]));
+    expect(result.events.at(-1)?.kind).toBe('fall');
+    const anim = new MoveAnimation(s, result, state, 1000);
+    expect(anim.inputAt).toBe(anim.end - config.fall.settleMs);
+    expect(anim.hudAt).toBe(1000 + config.clear.popMs);
+  });
+
+  it('input never opens after the animation ends, and tail effects do not block it', () => {
+    // Slime spreads after the board settles: a layers flash at the end of the timeline.
+    const s = game(['121', '212', '003'], { slime: ['x..', '...', '...'] });
+    const { state, result } = applyMove(s, cells(s, [2, 0], [2, 1]));
+    expect(result.events.at(-1)?.kind).toBe('layers');
+    const anim = new MoveAnimation(s, result, state, 0);
+    expect(anim.inputAt).toBeLessThan(anim.end - config.ice.crackMs);
+  });
+
+  it('a move that ends in a reshuffle opens input only at the end', () => {
+    // Two colors on a 1x3 strip get stuck often; play until it happens.
+    const strip: LevelDef = { id: 'strip', label: 'strip', seed: 3, moves: 1000, colors: [0, 1], goals: [], layout: ['...'] };
+    let s: GameState = createGame(strip, { playSeed: 4 });
+    for (let k = 0; k < 200; k++) {
+      const pair = [0, 1].map((i) => [i, i + 1]).find(([a, b]) => s.cells[a]?.kind === 'dot' && s.cells[b]?.kind === 'dot' &&
+        (s.cells[a] as { color: number }).color === (s.cells[b] as { color: number }).color)!;
+      const { state, result } = applyMove(s, pair);
+      if (result.shuffled) {
+        const anim = new MoveAnimation(s, result, state, 0);
+        expect(result.events.at(-1)?.kind).toBe('shuffle');
+        expect(anim.inputAt).toBe(anim.end);
+        return;
+      }
+      expect(hasMove(state)).toBe(true);
+      s = state;
+    }
+    throw new Error('never reshuffled');
   });
 });

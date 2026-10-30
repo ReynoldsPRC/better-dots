@@ -85,6 +85,11 @@ export class PlayScreen {
     if (!this.state) return;
     const f = this.anim?.frame(now) ?? null;
     drawScene(this.surface, this.layout, this.state, f, this.drag, { theme: currentTheme(), colorblind: this.hooks.colorblind() }, now);
+    // Counts change when the cleared dots have popped, not when the finger lifts.
+    if (this.anim && !this.anim.hudShown && now >= this.anim.hudAt) {
+      this.anim.hudShown = true;
+      this.renderHud();
+    }
     if (f?.done) {
       this.anim = null;
       if (this.state.status !== 'playing') this.hooks.onEnd(this.state);
@@ -98,8 +103,14 @@ export class PlayScreen {
     return [e.clientX - rect.left, e.clientY - rect.top];
   }
 
+  /** A new drag can start once the last move's dots have landed (or, under 'end', once it has fully finished). */
+  private inputOpen(now: number): boolean {
+    const a = this.anim;
+    return !a || now >= (config.input.unlockAt === 'end' ? a.end : a.inputAt);
+  }
+
   private down(e: PointerEvent): void {
-    if (this.drag || this.anim || this.state?.status !== 'playing') return;
+    if (this.drag || this.state?.status !== 'playing' || !this.inputOpen(performance.now())) return;
     const pt = this.point(e);
     const cell = cellAt(this.layout, pt[0], pt[1]);
     if (cell === null) return;
@@ -150,7 +161,6 @@ export class PlayScreen {
       const { state, result } = applyMove(this.state, d.path);
       this.anim = new MoveAnimation(this.state, result, state, performance.now());
       this.state = state;
-      this.renderHud();
     }
     this.redraw();
   }

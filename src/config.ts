@@ -37,6 +37,11 @@ export const config = {
     hitRadius: 0.46,
     /** Finger movement is sampled at this spacing (fraction of cell) so fast swipes don't skip dots. */
     sampleStep: 0.2,
+    /**
+     * When a new drag may start after a move: 'settle' as soon as the dots have
+     * landed (tail effects finish underneath it), or 'end' once everything has finished.
+     */
+    unlockAt: 'settle' as 'settle' | 'end',
   },
 
   line: {

@@ -58,6 +58,12 @@ export class MoveAnimation {
   private readonly color: ColorId;
   private readonly startLayers: Layers;
   readonly end: number;
+  /** When a new drag may start: the dots have landed; later effects (layer flashes, pulses) don't block. */
+  readonly inputAt: number;
+  /** When the HUD should change: the first cleared dots have popped. */
+  readonly hudAt: number;
+  /** Set by the play screen once it has updated the HUD for this move. */
+  hudShown = false;
 
   constructor(prev: GameState, result: MoveResult, _next: GameState, readonly start: number) {
     this.cols = prev.cols;
@@ -113,6 +119,11 @@ export class MoveAnimation {
       before = event.board;
     }
     this.end = start + t;
+    // The last segment that moves pieces; a fall's settle bounce doesn't block input.
+    const moving = this.segments.filter((s) => s.dur > 0 && ['fall', 'sink', 'fly', 'shuffle'].includes(s.event.kind)).at(-1);
+    this.inputAt = !moving ? this.end : start + moving.start + moving.dur - (moving.event.kind === 'fall' ? settleMs : 0);
+    const firstClear = this.segments.find((s) => s.event.kind === 'clear');
+    this.hudAt = start + (firstClear ? firstClear.start + popMs : 0);
   }
 
   frame(now: number): Frame {

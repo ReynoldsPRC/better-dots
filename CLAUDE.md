@@ -165,7 +165,7 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 - **Background** follows the phone's light/dark setting: light `#F5F2EC`, dark `#1C1B20`. Dot colors may be nudged lighter in dark mode for contrast.
 - **Colorblind mode** (toggle, built in from the start): each color gets a small symbol inside its dots: triangle, bar, plus, ring, diamond.
 - Flat circular dots. The connection line is drawn in the dot's color. Loops get a brief board-wide pulse in that color.
-- **Feel priorities:** the line tracks the finger tightly; dots fall with slight easing and a small settle; cascades are readable.
+- **Feel priorities:** the line tracks the finger tightly; dots fall with slight easing and a small settle; cascades are readable. A new drag can start as soon as the dots have landed; tail effects finish underneath it (`config.input.unlockAt`: `'settle'`, or `'end'` to wait for everything). HUD counts change when the cleared dots have popped, not when the finger lifts.
 - **Sound:** no music. Soft synthesized tones (Web Audio, no audio files) that rise in pitch as the line grows, and a distinct chime on loops. Light haptics where the browser supports them. Mute toggle.
 - **Level select:** a plain grid of numbered levels grouped by world. Illustrated world art may come later from the player's own drawings.
 
