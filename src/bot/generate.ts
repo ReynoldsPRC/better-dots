@@ -198,8 +198,16 @@ function mergeIce(a: string[] | undefined, b: string[], layout: string[]): strin
   return layout.map((row, r) => [...row].map((_, c) => (b[r][c] !== '.' ? b[r][c] : a?.[r][c] ?? '.')).join(''));
 }
 
-/** Builds one candidate, or null if the bot couldn't make it fit the target. */
+/** Builds one candidate, or null if the bot couldn't make it fit the target (or the level can't be built). */
 export function generateCandidate(p: GenParams, seed: number, name?: string): Candidate | null {
+  try {
+    return tryCandidate(p, seed, name);
+  } catch {
+    return null;
+  }
+}
+
+function tryCandidate(p: GenParams, seed: number, name?: string): Candidate | null {
   const rng = new Rng(seedRng(seed));
   const palette = rng.shuffle([0, 1, 2, 3, 4] as ColorId[]).slice(0, p.colors).sort((a, b) => a - b);
   const layout = makeLayout(p, rng);

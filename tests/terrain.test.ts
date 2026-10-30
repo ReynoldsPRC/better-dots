@@ -43,13 +43,16 @@ describe('walls', () => {
   });
 
   it('pairs split by walls are not moves, so the board is reshuffled', () => {
-    // Only same-color neighbors are (0,0)-(0,1), and a wall separates them.
-    const level: LevelDef = {
-      id: 't', label: 't', seed: 1, moves: 5, colors: [0, 1], goals: [],
-      layout: ['00', '1-'], walls: [{ r: 0, c: 0, side: 'right' }],
-    };
-    const s = createGame(level);
-    expect(hasMove(s)).toBe(true);
+    // A wall separates the fixed 0s, so the random cell below must become a 0 to pair with (0,0).
+    for (let seed = 1; seed <= 10; seed++) {
+      const level: LevelDef = {
+        id: 't', label: 't', seed, moves: 5, colors: [0, 1], goals: [],
+        layout: ['00', '.-'], walls: [{ r: 0, c: 0, side: 'right' }],
+      };
+      const s = createGame(level);
+      expect(hasMove(s)).toBe(true);
+      expect(colors(s)).toEqual(['00', '0-']);
+    }
   });
 
   it('walls do not affect falling', () => {
@@ -92,7 +95,7 @@ describe('shaped boards', () => {
   });
 
   it('a line cannot jump over an empty cell', () => {
-    const s = game(['0-0', '1-1']);
+    const s = game(['0-0', '1-1', '1-1']);
     expect(extendPath(s, cells(s, [0, 0]), at(s, 0, 2))).toEqual(cells(s, [0, 0]));
   });
 

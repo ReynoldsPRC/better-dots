@@ -57,8 +57,13 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
 
   const boardRng = new Rng(seedRng(level.seed));
   const burningAtStart = (i: number) => (level.fire?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x';
+  /** Cells the level left to chance ('.'); the opening shuffle may only move these. */
+  const random = new Set<number>();
   for (let i = 0; i < cells.length; i++) {
-    if (playable[i] && cells[i] === null && !burningAtStart(i)) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
+    if (playable[i] && cells[i] === null && !burningAtStart(i)) {
+      cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
+      random.add(i);
+    }
   }
 
   const ice = cells.map((_, i) => {
@@ -95,7 +100,9 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     anchorDrops: level.anchorDrops ?? 0,
     anchorTarget: Math.max(1, startAnchors),
   };
-  state.cells = reshuffleUntilPlayable(state, state.cells, boardRng);
+  // At the start only the randomly filled cells are shuffled; dots the level placed stay put.
+  state.cells = reshuffleUntilPlayable(state, state.cells, boardRng, (i) => random.has(i));
+  if (!hasMove(state)) throw new Error(`level ${level.label}: the fixed dots leave no opening move`);
   state.rng = opts.playSeed === undefined ? boardRng.state : seedRng(opts.playSeed);
   return state;
 }
@@ -169,10 +176,11 @@ function cloneLayers(l: Layers): Layers {
 /**
  * Moves the regular dots around until a legal move exists. Other pieces stay
  * put. If shuffling alone can't do it, recolors one dot to match a neighbor.
+ * Only dots on cells where `movable` holds are shuffled or recolored.
  */
-function reshuffleUntilPlayable(s: GameState, cells: Cells, rng: Rng): Cells {
+function reshuffleUntilPlayable(s: GameState, cells: Cells, rng: Rng, movable: (i: number) => boolean = () => true): Cells {
   if (hasMove(s, cells)) return cells;
-  const spots = cells.flatMap((p, i) => (p?.kind === 'dot' && !isFixed(s, i) ? [i] : []));
+  const spots = cells.flatMap((p, i) => (p?.kind === 'dot' && !isFixed(s, i) && movable(i) ? [i] : []));
   let out = cells;
   for (let attempt = 0; attempt < 100; attempt++) {
     out = cells.slice();
@@ -180,12 +188,15 @@ function reshuffleUntilPlayable(s: GameState, cells: Cells, rng: Rng): Cells {
     spots.forEach((i, k) => (out[i] = dots[k]));
     if (hasMove(s, out)) return out;
   }
-  for (const a of spots) {
-    const b = spots.find((j) => canCross(s, a, j));
-    if (b !== undefined) {
-      const color = (out[a] as Extract<Piece, { kind: 'dot' }>).color;
-      out[b] = { ...(out[b] as Extract<Piece, { kind: 'dot' }>), color };
-      return out;
+  // Recolor a shuffled dot to match any connectable neighbor (shuffled or not).
+  const view = { ...s, cells: out };
+  for (const b of spots) {
+    for (const a of cellsAround(s, b, 1)) {
+      const color = canCross(s, a, b) ? connectableColor(view, a) : null;
+      if (color !== null) {
+        out[b] = { ...(out[b] as Extract<Piece, { kind: 'dot' }>), color };
+        return out;
+      }
     }
   }
   return out;

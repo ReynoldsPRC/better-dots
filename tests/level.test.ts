@@ -114,9 +114,9 @@ describe('catalog', () => {
     expect(unlocked(after, 'ddd111')).toBe(true);
   });
 
-  it('every shipped level file is valid and starts playable', () => {
+  it('every shipped level and candidate builds and starts playable', () => {
     expect(catalog.order.length).toBeGreaterThan(0);
-    for (const level of catalog.order) {
+    for (const level of [...catalog.order, ...candidates.order]) {
       const s = createGame(level);
       expect(hasMove(s), level.label).toBe(true);
     }

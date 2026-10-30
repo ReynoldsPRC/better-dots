@@ -70,7 +70,7 @@ Non-negotiable. Don't add any of these, even as an option:
 - **Clears are clears:** every way of clearing a cell (line, loop, bomb, gem beam, power-up) counts the same for obstacle interactions and goal progress.
 - **Chain resolution:** explosions and beams can trigger further bombs and gems. Resolve in a fixed, deterministic order and animate the cascade in sequence so it reads clearly.
 - **Moves and goals:** each level has a move limit and one or more goals. Meet all goals before moves run out to win.
-- **Stuck board:** if no legal move exists, reshuffle the regular dots automatically. Free, costs no move. Obstacles stay put.
+- **Stuck board:** if no legal move exists, reshuffle the regular dots automatically. Free, costs no move. Obstacles stay put. At the start only the randomly filled cells are shuffled; dots the level placed stay put. A level whose placed dots leave no opening move is an error.
 
 ## Board terrain
 

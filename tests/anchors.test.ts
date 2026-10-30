@@ -65,12 +65,15 @@ describe('anchors', () => {
   });
 
   it('stay put when a stuck board is reshuffled', () => {
-    const s = createGame({
-      id: 't', label: 't', seed: 1, moves: 9, colors: [0, 1], goals: [], layout: ['01.', '10.', '01.'],
-      pieces: [{ r: 0, c: 2, type: 'anchor' }, { r: 1, c: 2, type: 'anchor' }, { r: 2, c: 2, type: 'anchor' }],
-    });
-    expect(hasMove(s)).toBe(true);
-    for (const r of [0, 1, 2]) expect(anchorAt(s, r, 2)).toBe(true);
+    // Two colors on a 3x2 area get stuck for some seeds.
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = createGame({
+        id: 't', label: 't', seed, moves: 9, colors: [0, 1], goals: [], layout: ['...', '...', '...'],
+        pieces: [{ r: 0, c: 2, type: 'anchor' }, { r: 1, c: 2, type: 'anchor' }, { r: 2, c: 2, type: 'anchor' }],
+      });
+      expect(hasMove(s)).toBe(true);
+      for (const r of [0, 1, 2]) expect(anchorAt(s, r, 2)).toBe(true);
+    }
   });
 
   it('level files: pieces and anchor goals are checked', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyMove, extendPath, hasMove, isValidPath, parseLevel, type GameState } from '../src/rules';
-import { at, cells, game } from './helpers';
+import { at, cells, colorOf, game } from './helpers';
 
 const iceAt = (s: GameState, r: number, c: number) => s.layers.ice[at(s, r, c)];
 
@@ -66,10 +66,14 @@ describe('ice', () => {
   });
 
   it('frozen dots do not count as moves and stay put in a reshuffle', () => {
-    const s = game(['00', '12'], { ice: ['11', '..'], colors: [1, 2] });
-    expect(hasMove(s)).toBe(true);
-    expect(s.layers.ice).toEqual([1, 1, 0, 0]);
-    expect(s.cells[0]!.kind).toBe('dot');
+    // The frozen 0s can't pair, so the bottom row must; "12" or "21" gets fixed up.
+    for (let seed = 1; seed <= 10; seed++) {
+      const s = game(['00', '..'], { ice: ['11', '..'], colors: [1, 2], seed });
+      expect(hasMove(s)).toBe(true);
+      expect(s.layers.ice).toEqual([1, 1, 0, 0]);
+      expect([colorOf(s.cells[0]), colorOf(s.cells[1])]).toEqual([0, 0]);
+      expect(colorOf(s.cells[2])).toBe(colorOf(s.cells[3]));
+    }
   });
 
   it('level files: ice grids and ice goals are checked', () => {

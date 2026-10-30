@@ -22,10 +22,26 @@ describe('createGame', () => {
     expect(new Set(ids(s)).size).toBe(8);
   });
 
-  it('reshuffles a starting board that has no move', () => {
-    const s = game(['0101', '1010', '0101']);
-    expect(hasMove(s)).toBe(true);
-    expect(colors(s).join('').split('').sort()).toEqual('010110100101'.split('').sort());
+  it('the opening shuffle only moves randomly filled dots; the level\'s own dots stay put', () => {
+    // Two random cells next to a fixed checkerboard: some seeds fill them with no move.
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = game(['0101', '1010', '01..'], { seed });
+      expect(hasMove(s)).toBe(true);
+      const [r0, r1, r2] = colors(s);
+      expect([r0, r1, r2.slice(0, 2)]).toEqual(['0101', '1010', '01']);
+    }
+  });
+
+  it('if shuffling can\'t make a move, a random dot is recolored to match a fixed neighbor', () => {
+    // One random cell whose fixed neighbors are both 0: a 1 there leaves no move.
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = game(['0101', '1010', '010.'], { seed, colors: [0, 1] });
+      expect(colors(s)).toEqual(['0101', '1010', '0100']);
+    }
+  });
+
+  it('a level whose fixed dots leave no opening move is rejected', () => {
+    expect(() => game(['0101', '1010', '0101'])).toThrow(/the fixed dots leave no opening move/);
   });
 
   it('rejects unknown layout characters', () => {
