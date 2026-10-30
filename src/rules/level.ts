@@ -5,6 +5,27 @@ import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type PlacedPiece, t
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLORS;
 
+/** Every key a level file may have. Anything else is most likely a typo. */
+const LEVEL_KEYS = [
+  'id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'ice', 'water', 'slime', 'fire', 'goals', 'stars', 'bot',
+];
+const GOAL_KEYS: Record<string, string[]> = {
+  collect: ['type', 'color', 'count'],
+  anchors: ['type', 'count'],
+  ice: ['type', 'count'],
+  gems: ['type', 'count'],
+  ladybugs: ['type', 'count'],
+  flood: ['type'],
+  slime: ['type'],
+  fire: ['type'],
+};
+const PIECE_KEYS: Record<string, string[]> = {
+  anchor: ['r', 'c', 'type'],
+  gem: ['r', 'c', 'type', 'color', 'shape'],
+  ladybug: ['r', 'c', 'type', 'color', 'spots'],
+};
+const WALL_KEYS = ['r', 'c', 'side'];
+
 /** A level file's stable id: lowercase letters and digits. */
 export const LEVEL_ID = /^[a-z0-9]{6,12}$/;
 
@@ -18,6 +39,13 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
   };
   if (typeof raw !== 'object' || raw === null) fail('not an object');
   const o = raw as Record<string, unknown>;
+  /** Fails on the first key of `obj` not in `allowed`. */
+  const onlyKeys = (obj: unknown, allowed: readonly string[] | undefined, where: string) => {
+    if (typeof obj !== 'object' || obj === null || !allowed) return;
+    const bad = Object.keys(obj).find((k) => !allowed.includes(k));
+    if (bad !== undefined) fail(`${where}unknown key ${JSON.stringify(bad)}`);
+  };
+  onlyKeys(o, LEVEL_KEYS, '');
 
   if (typeof o.id !== 'string' || !LEVEL_ID.test(o.id)) fail('"id" must be 6-12 lowercase letters or digits (run: npm run levels -- ids)');
 
@@ -47,6 +75,7 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
     if (!Array.isArray(o.walls)) fail('"walls" must be a list');
     walls = (o.walls as unknown[]).map((w, k): Wall => {
       const wo = w as Record<string, unknown>;
+      onlyKeys(wo, WALL_KEYS, `wall ${k}: `);
       const sides = ['up', 'down', 'left', 'right'];
       if (!isInt(wo?.r) || !isInt(wo.c) || !sides.includes(wo.side as string)) {
         fail(`wall ${k}: must be { "r": row, "c": col, "side": "up" | "down" | "left" | "right" }`);
@@ -92,6 +121,7 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
     pieces = (o.pieces as unknown[]).map((x, k): PlacedPiece => {
       const po = x as Record<string, unknown>;
       if (!cellAt(po?.r as number, po?.c as number)) fail(`piece ${k}: "r" and "c" must name a cell of the layout`);
+      onlyKeys(po, PIECE_KEYS[po.type as string], `piece ${k}: `);
       const at = `${po.r},${po.c}`;
       if (taken.has(at)) fail(`piece ${k}: another piece is already at row ${po.r}, col ${po.c}`);
       taken.add(at);
@@ -130,6 +160,7 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
   };
   const goals = (o.goals as unknown[]).map((g, k): Goal => {
     const go = g as Record<string, unknown>;
+    onlyKeys(go, GOAL_KEYS[go?.type as string], `goal ${k}: `);
     switch (go?.type) {
       case 'collect':
         if (!isColor(go.color) || !(colors as number[]).includes(go.color)) fail(`goal ${k}: color must be one of "colors"`);
@@ -173,6 +204,7 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
   let stars: LevelDef['stars'];
   if (o.stars !== undefined) {
     const s = o.stars as Record<string, unknown>;
+    onlyKeys(s, ['two', 'three'], '"stars": ');
     if (!isInt(s?.two) || !isInt(s?.three) || s.three > s.two || s.two > (o.moves as number) || s.three < 1) {
       fail('"stars" must be { "two": n, "three": m } with 1 <= three <= two <= moves');
     }

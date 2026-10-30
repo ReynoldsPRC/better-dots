@@ -28,6 +28,11 @@ describe('parseLevel', () => {
     ['goal type', { goals: [{ type: 'nope', color: 0, count: 1 }] }, /unknown type/],
     ['goal color', { goals: [{ type: 'collect', color: 4, count: 1 }] }, /color/],
     ['stars order', { stars: { two: 5, three: 9 } }, /stars/],
+    ['unknown top-level key', { anchorDrop: 2 }, /unknown key "anchorDrop"/],
+    ['unknown goal key', { goals: [{ type: 'collect', color: 0, count: 1, colour: 1 }] }, /goal 0: unknown key "colour"/],
+    ['unknown piece key', { pieces: [{ r: 0, c: 0, type: 'anchor', spots: 2 }] }, /piece 0: unknown key "spots"/],
+    ['unknown wall key', { walls: [{ r: 0, c: 0, side: 'right', thick: true }] }, /wall 0: unknown key "thick"/],
+    ['unknown stars key', { stars: { two: 5, three: 3, one: 9 } }, /unknown key "one"/],
   ])('rejects bad %s', (_, patch, msg) => {
     expect(() => parseLevel({ ...valid, ...patch }, 'x')).toThrow(msg);
   });
