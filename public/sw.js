@@ -1,4 +1,5 @@
-// Offline service worker. Bump VERSION to force old caches out.
+// Offline service worker. VERSION is stamped with the git SHA at build (vite.config.ts),
+// so each deploy gets a fresh cache and the old one is evicted on the next load.
 const VERSION = 'v1';
 const CACHE = `better-dots-${VERSION}`;
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/apple-touch-icon.png'];
