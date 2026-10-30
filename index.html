@@ -14,20 +14,19 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" type="image/png" href="./icons/icon-192.png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <style>
-      :root { --bg: #F5F2EC; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #1C1B20; } }
-      html, body {
-        margin: 0; height: 100%; background: var(--bg);
-        overflow: hidden; overscroll-behavior: none;
-        -webkit-user-select: none; user-select: none;
-        -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
-      }
-      #game { display: block; width: 100vw; height: 100dvh; touch-action: none; }
-    </style>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <canvas id="game"></canvas>
+    <section id="play" class="screen">
+      <canvas id="game"></canvas>
+      <header id="hud">
+        <button id="btn-back" class="icon-btn" aria-label="Levels">‹</button>
+        <div id="goals"></div>
+        <div id="moves-box"><span id="moves">0</span><small>moves</small></div>
+        <button id="btn-settings" class="icon-btn" aria-label="Settings">⋯</button>
+      </header>
+    </section>
+    <div id="overlay" hidden></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

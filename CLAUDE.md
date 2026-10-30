@@ -37,7 +37,10 @@ Non-negotiable. Don't add any of these, even as an option:
 ### Layout and commands
 
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
-- `src/render/`: canvas drawing. `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
+- `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` (clear stages, settled board, spawned ids) that the render layer animates.
+- `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
+- A board with no goals never counts as won (sandbox). Retrying a level keeps its starting layout (from the level seed) but uses a new play seed for refills.
+- Dev builds expose the play screen as `window.__play` for console poking.
 - `public/sw.js`: service worker (network-first for the page, cache-first for hashed assets; bump `VERSION` to evict old caches). `public/manifest.webmanifest`. Icons come from `npm run icons`.
 - `npm test`, `npm run dev`, `npm run phone` (dev server on the LAN), `npm run build`.
 - Hosting: GitHub Pages via `.github/workflows/deploy.yml`. Every push to `main` runs the tests, builds, and deploys. The build uses relative paths (`base: './'`), so it works under the repo subpath.
