@@ -59,6 +59,22 @@ describe('fire', () => {
     expect(burning(state)).toEqual([0]);
   });
 
+  it('does not spread onto watered or slimed cells', () => {
+    // Both of the fire's neighbors are covered by another hazard, so it has nowhere to go.
+    for (const other of ['water', 'slime'] as const) {
+      const s = game(['.12', '212', '100'], { fire: ['x..', '...', '...'], [other]: ['.x.', 'x..', '...'] });
+      const { state } = applyMove(s, cells(s, [2, 1], [2, 2]));
+      expect(burning(state), other).toEqual([0]);
+    }
+  });
+
+  it('slime does not spread onto burning cells', () => {
+    const s = game(['..2', '.12', '100'], { fire: ['.x.', 'x..', '...'], slime: ['x..', '...', '...'] });
+    const { state } = applyMove(s, cells(s, [2, 1], [2, 2]));
+    expect(state.layers.slime.flatMap((x, i) => (x ? [i] : []))).toEqual([0]);
+    expect(state.layers.fire[0]).toBe(false);
+  });
+
   it('fire under ice is dormant: it does not spread, cannot be put out, and still counts', () => {
     const s = game(['.12', '212', '100'], { fire: ['x..', '...', '...'], ice: ['2..', '...', '...'], goals: [{ type: 'fire' }] });
     expect(goalRemaining(s, s.goals[0])).toBe(1);

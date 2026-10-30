@@ -64,6 +64,25 @@ describe('anchors', () => {
     expect(spawnedAnchor).toBeDefined();
   });
 
+  it('a frozen anchor on the bottom cell does not sink until its ice breaks', () => {
+    const frozen = (thickness: number) => createGame(level({
+      layout: ['121', '001', '.21'], pieces: [{ r: 2, c: 0, type: 'anchor' }], ice: ['...', '...', `${thickness}..`],
+    }));
+    // Not touching the ice: nothing happens to it.
+    let s = frozen(2);
+    let next = applyMove(s, cells(s, [0, 2], [1, 2])).state;
+    expect(anchorAt(next, 2, 0)).toBe(true);
+    expect(next.goals[0].progress).toBe(0);
+    // Cracked but still frozen: stays.
+    next = applyMove(s, cells(s, [1, 0], [1, 1])).state;
+    expect(next.layers.ice[at(s, 2, 0)]).toBe(1);
+    expect(anchorAt(next, 2, 0)).toBe(true);
+    // Ice broken by the move: it sinks in that move's settle.
+    s = frozen(1);
+    next = applyMove(s, cells(s, [1, 0], [1, 1])).state;
+    expect(next.goals[0].progress).toBe(1);
+  });
+
   it('stay put when a stuck board is reshuffled', () => {
     // Two colors on a 3x2 area get stuck for some seeds.
     for (let seed = 1; seed <= 20; seed++) {

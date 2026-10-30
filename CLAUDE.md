@@ -84,7 +84,7 @@ Each one is introduced in its own world (see Build order).
 
 ### Anchors
 - Not connectable. Fall with gravity like dots.
-- Sink when they reach the bottom of their column (its lowest cell, even on shaped boards): removed and counted toward the anchor goal.
+- Sink when they reach the bottom of their column (its lowest cell, even on shaped boards): removed and counted toward the anchor goal. A frozen anchor on the bottom cell doesn't sink until its ice breaks (ice protects).
 - Bombs and beams don't affect anchors, and a loop around an anchor doesn't make it a bomb. Anchors only leave by sinking. Reshuffles leave them in place.
 - Level data sets the starting anchors and how many more can drop in from the top.
 
@@ -105,13 +105,13 @@ Each one is introduced in its own world (see Build order).
 ### Fire
 - Burning cells hold no dot. Default: dots don't fall through them.
 - Extinguish a burning cell by clearing a cell orthogonally adjacent to it. It becomes a normal cell and refills.
-- Each move in which no fire is extinguished, fire spreads to one adjacent cell, destroying its dot.
+- Each move in which no fire is extinguished, fire spreads to one adjacent cell, destroying its dot. It doesn't spread onto watered or slimed cells (hazards don't overlap).
 - Putting out fire happens with the other layer reactions right after the cascade, so the cell refills in the same move. Spreading happens after the board settles, to a seeded pick among unfrozen, non-burning cells orthogonally next to active fire that hold a regular dot or nothing (anchors, gems, and ladybugs are safe). The destroyed dot doesn't count toward goals. A blast landing on a burning cell doesn't put it out; clearing a neighbor does. Fire under ice is dormant until the ice breaks.
 - Goal: extinguish all fire.
 
 ### Slime
 - A layer under dots. Clearing a dot on a slimed cell cleans that cell.
-- Each move in which no slime is cleaned, slime spreads to one adjacent clean cell.
+- Each move in which no slime is cleaned, slime spreads to one adjacent clean cell that isn't burning.
 - Cleaning happens with the other layer reactions right after the cascade; spreading happens after the board settles, to a seeded pick among clean, unfrozen cells orthogonally next to active slime. Slime under ice is dormant: it can't be cleaned, doesn't spread, and still counts toward the goal.
 - Goal: clean all slime.
 
@@ -188,6 +188,6 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 - Walls don't block falling
 - Anchors ignore bombs and beams; one new anchor drops in at a time
 - Water floods the whole cleared line
-- Fire and slime spread one cell per move
+- Fire and slime spread one cell per move, and never onto each other or onto water
 - Star cutoffs
 - Power-ups cost no move

@@ -208,7 +208,7 @@ export interface MoveResult {
   events: MoveEvent[];
   /** The clear stages, in order (a view over `events`). */
   steps: ClearStep[];
-  /** Board after the last gravity pass, before any reshuffle. */
+  /** Board after the move settled and hazards spread, before any reshuffle. */
   settled: Cells;
   /** Ids of every piece that entered this move. */
   spawned: number[];

@@ -428,8 +428,9 @@ class Move {
   /**
    * After the board settles, ignored hazards grow (seeded picks):
    * - Fire, if none went out this move, spreads to one neighboring cell and
-   *   destroys its dot (cells with other pieces are safe).
-   * - Slime, if none was cleaned this move, spreads to one neighboring clean cell.
+   *   destroys its dot (cells with other pieces, water, or slime are safe).
+   * - Slime, if none was cleaned this move, spreads to one neighboring clean
+   *   cell that isn't burning. Hazards never overlap.
    */
   spread(): void {
     const { s, layers, cells } = this;
@@ -443,7 +444,7 @@ class Move {
       return options.size === 0 ? null : this.rng.pick([...options].sort((a, b) => a - b));
     };
     if (this.fireOut === 0) {
-      const target = pickNext(layers.fire, (j) => cells[j] === null || cells[j]!.kind === 'dot');
+      const target = pickNext(layers.fire, (j) => (cells[j] === null || cells[j]!.kind === 'dot') && !layers.water[j] && !layers.slime[j]);
       if (target !== null) {
         layers.fire[target] = true;
         cells[target] = null;
@@ -528,14 +529,14 @@ class Move {
     this.emit({ kind: 'fall', spawnFrom });
   }
 
-  /** Falls, sinks anchors that reached the bottom, and repeats until nothing sinks. */
+  /** Falls, sinks anchors that reached the bottom (unless frozen there), and repeats until nothing sinks. */
   settle(): void {
     for (let pass = 0; pass < 50; pass++) {
       this.fall();
       const sunk: number[] = [];
       for (let c = 0; c < this.s.cols; c++) {
         const b = this.bottomOf(c);
-        if (b >= 0 && this.cells[b]?.kind === 'anchor') sunk.push(b);
+        if (b >= 0 && this.cells[b]?.kind === 'anchor' && this.layers.ice[b] === 0) sunk.push(b);
       }
       if (sunk.length === 0) return;
       for (const i of sunk) this.cells[i] = null;
