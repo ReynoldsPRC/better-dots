@@ -67,7 +67,9 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     return n;
   });
 
-  const water = cells.map((_, i) => (level.water?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x');
+  const marked = (g: string[] | undefined) => cells.map((_, i) => (g?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x');
+  const water = marked(level.water);
+  const slime = marked(level.slime);
 
   const startAnchors = cells.filter((p) => p?.kind === 'anchor').length;
   const state: GameState = {
@@ -77,7 +79,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     wallRight,
     wallDown,
     cells,
-    layers: { ice, water },
+    layers: { ice, water, slime },
     colors: level.colors.slice(),
     rng: 0,
     nextId,
@@ -124,6 +126,8 @@ export function goalRemaining(s: GameState, g: GoalState): number {
   switch (g.goal.type) {
     case 'flood':
       return s.playable.filter((p, i) => p && !s.layers.water[i]).length;
+    case 'slime':
+      return s.layers.slime.filter(Boolean).length;
     default:
       return Math.max(0, g.goal.count - g.progress);
   }
@@ -155,7 +159,7 @@ function isFixed(s: GameState, i: number): boolean {
 }
 
 function cloneLayers(l: Layers): Layers {
-  return { ice: l.ice.slice(), water: l.water.slice() };
+  return { ice: l.ice.slice(), water: l.water.slice(), slime: l.slime.slice() };
 }
 
 /**
@@ -200,6 +204,8 @@ class Move {
   private readonly toFly = new Set<number>();
   /** Bomb cells this wave: a ladybug there is removed whatever its spots. */
   private bombCells = new Set<number>();
+  /** Slimed cells cleaned this move. */
+  slimeCleaned = 0;
   /** Gems already set off this move (by piece id), so each goes off once. */
   private readonly triggered = new Set<number>();
   /** Gems set off during the current blast wave; they fire in the next. */
@@ -316,6 +322,7 @@ class Move {
    * End-of-cascade layer effects, in order:
    * - Water: cleared cells touching active water become watered, and the flood
    *   carries on through every connected cleared cell.
+   * - Slime on a cleared cell is cleaned.
    * - Ice loses one layer if a cell next to it was cleared or a blast reached it
    *   (one layer per move at most). Hazards under it wake up from then on.
    */
@@ -338,6 +345,15 @@ class Move {
     for (const i of [...flooded].sort((a, b) => a - b)) {
       layers.water[i] = true;
       changed.push(i);
+    }
+
+    // Slime: clearing a piece on a slimed cell cleans it.
+    for (const i of [...this.cleared].sort((a, b) => a - b)) {
+      if (layers.slime[i] && layers.ice[i] === 0) {
+        layers.slime[i] = false;
+        this.slimeCleaned++;
+        changed.push(i);
+      }
     }
 
     for (let i = 0; i < layers.ice.length; i++) {
@@ -379,6 +395,25 @@ class Move {
       this.stage('blast', hit, sources);
       sources = this.nextWave.sort((a, b) => a.cell - b.cell);
     }
+  }
+
+  /**
+   * After the board settles: if no slime was cleaned this move, active slime
+   * spreads to one neighboring clean cell (seeded).
+   */
+  spread(): void {
+    const { s, layers } = this;
+    if (this.slimeCleaned > 0) return;
+    const active = (i: number) => layers.slime[i] && layers.ice[i] === 0;
+    const options = new Set<number>();
+    for (let i = 0; i < layers.slime.length; i++) {
+      if (!active(i)) continue;
+      for (const j of orthogonal(s, i)) if (!layers.slime[j] && layers.ice[j] === 0) options.add(j);
+    }
+    if (options.size === 0) return;
+    const target = this.rng.pick([...options].sort((a, b) => a - b));
+    layers.slime[target] = true;
+    this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: [target] });
   }
 
   /** Lowest cell of a column, where anchors sink. */
@@ -487,6 +522,7 @@ function progressFor(g: GoalState, t: Tally): number {
     case 'ice':
       return t.ice;
     case 'flood':
+    case 'slime':
       return 0;
     case 'gems':
       return t.gems;
@@ -507,6 +543,7 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   m.react();
   m.fly();
   m.settle();
+  m.spread();
   const settled = m.cells.slice();
 
   const next: GameState = {

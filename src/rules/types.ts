@@ -68,7 +68,9 @@ export type Goal =
   /** Water every cell. */
   | { type: 'flood' }
   | { type: 'gems'; count: number }
-  | { type: 'ladybugs'; count: number };
+  | { type: 'ladybugs'; count: number }
+  /** Clean every slimed cell. */
+  | { type: 'slime' };
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
@@ -76,6 +78,8 @@ export interface Layers {
   ice: number[];
   /** Watered cells. Water under ice is dormant until the ice breaks. */
   water: boolean[];
+  /** Slimed cells. Slime under ice is dormant until the ice breaks. */
+  slime: boolean[];
 }
 
 export interface GoalState {
@@ -106,6 +110,8 @@ export interface LevelDef {
   ice?: string[];
   /** Watered cells at the start: one string per row, '.' dry or 'x' watered. */
   water?: string[];
+  /** Slimed cells at the start: one string per row, '.' clean or 'x' slimed. */
+  slime?: string[];
   goals: Goal[];
   /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
   stars?: { two: number; three: number };

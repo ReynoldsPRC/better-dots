@@ -67,6 +67,16 @@ export function goalIcon(goal: Goal, colorblind: boolean, size = 22): HTMLCanvas
     case 'ladybugs':
       drawPiece(ctx, { kind: 'ladybug', id: 0, color: 0, spots: 3 }, r, r * 1.08, r * 0.78, { theme, colorblind: false });
       break;
+    case 'slime':
+      ctx.fillStyle = config.slime.fill[theme];
+      ctx.beginPath();
+      ctx.ellipse(r, r, r - 2, r - 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = config.slime.bubble[theme];
+      ctx.beginPath();
+      ctx.arc(r - r * 0.35, r + r * 0.3, r * 0.14, 0, Math.PI * 2);
+      ctx.fill();
+      break;
     case 'flood':
       ctx.fillStyle = config.water.fill[theme];
       ctx.beginPath();

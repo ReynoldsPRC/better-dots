@@ -112,6 +112,15 @@ export const config = {
     radius: 0.24,
   },
 
+  slime: {
+    /** Slime blob and bubble colors, light and dark themes. Dull olive so it never reads as the sage dot. */
+    fill: { light: '#B3AC7E', dark: '#5E5A3C' },
+    bubble: { light: '#CFC9A2', dark: '#7A7550' },
+    /** Blob size as a fraction of cell size; how much its edge wobbles. */
+    scale: 0.9,
+    wobble: 0.05,
+  },
+
   shuffle: {
     /** Pause before an automatic reshuffle, then how long dots take to swap places. */
     delayMs: 250,

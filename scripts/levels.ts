@@ -124,7 +124,9 @@ switch (cmd) {
     const [w, ...which] = nums;
     const dir = cmd === 'drop' ? worldDir(w) : candDir(w);
     for (const k of which) {
-      rmSync(join(dir, `${pad(k)}.json`));
+      const file = join(dir, `${pad(k)}.json`);
+      if (!existsSync(file)) throw new Error(`no ${cmd === 'drop' ? 'level' : 'candidate'} ${w}-${k} (${file})`);
+      rmSync(file);
       console.log(`removed ${cmd === 'drop' ? '' : 'candidate '}${w}-${k}`);
     }
     renumber(dir);

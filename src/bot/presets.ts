@@ -52,4 +52,10 @@ export const presets: Record<number, Preset> = {
     collectGoals: t < 0.4 ? 0 : 1, ladybugs: lerp(1, 4, t),
     targetMoves: [lerp(4, 16, t), lerp(12, 30, t)],
   }),
+  // World 9: slime (some frozen over later on).
+  9: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: t < 0.2 ? 3 : t < 0.9 ? 4 : 5, holes: lerp(0, 4, t),
+    collectGoals: 0, slime: { cells: lerp(2, 8, t), underIce: t > 0.6 ? 2 : 0 },
+    targetMoves: [lerp(4, 16, t), lerp(12, 30, t)],
+  }),
 };

@@ -46,6 +46,7 @@ export function drawScene(
 
   drawTerrain(ctx, layout, state, theme);
   drawWater(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
+  drawSlime(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
 
   const dragColor = drag && drag.path.length > 0 ? connectableColor(state, drag.path[0]) : null;
 
@@ -203,6 +204,45 @@ function drawWater(
     const y = y0 + (Math.floor(i / s.cols) + 0.5) * cell - size / 2;
     ctx.beginPath();
     ctx.roundRect(x, y, size, size, cell * t.radius);
+    ctx.fill();
+  }
+}
+
+/**
+ * Slime: a lumpy blob with a couple of bubbles, under the dots. Newly slimed
+ * cells ooze in; cleaned cells shrink away.
+ */
+function drawSlime(
+  ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers, changed: LayerChange[], theme: Theme,
+) {
+  const { cell, x0, y0 } = layout;
+  const t = config.slime;
+  const grow = new Map(changed.filter((c) => c.layer === 'slime').map((c) => [c.cell, c.progress]));
+  for (let i = 0; i < layers.slime.length; i++) {
+    const g = grow.get(i);
+    if (!layers.slime[i] && g === undefined) continue;
+    // Growing in, or (if the cell is clean now) shrinking away.
+    const k = g === undefined ? 1 : layers.slime[i] ? ease('easeOutCubic', g) : 1 - ease('easeInQuad', g);
+    if (k <= 0) continue;
+    const cx = x0 + (i % s.cols + 0.5) * cell;
+    const cy = y0 + (Math.floor(i / s.cols) + 0.5) * cell;
+    const rad = (cell * t.scale * k) / 2;
+    ctx.fillStyle = t.fill[theme];
+    ctx.beginPath();
+    for (let a = 0; a <= 16; a++) {
+      const ang = (a / 16) * Math.PI * 2;
+      const wob = 1 + t.wobble * Math.sin(ang * 3 + i) - t.wobble * 0.5 * Math.cos(ang * 5 + i * 2);
+      const px = cx + Math.cos(ang) * rad * wob;
+      const py = cy + Math.sin(ang) * rad * wob;
+      if (a === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = t.bubble[theme];
+    ctx.beginPath();
+    ctx.arc(cx - rad * 0.55, cy + rad * 0.45, rad * 0.12, 0, Math.PI * 2);
+    ctx.arc(cx + rad * 0.6, cy - rad * 0.5, rad * 0.09, 0, Math.PI * 2);
     ctx.fill();
   }
 }

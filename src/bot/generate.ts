@@ -24,6 +24,8 @@ export interface GenParams {
   ice?: { perSize: number; max: number; thickness: [number, number] };
   /** Gem goal: this many gems (a share of them cross gems) in the board's colors; set them all off. */
   gems?: { count: number; crossShare: number };
+  /** Slime goal: this many slimed cells to start (mirrored), `underIce` of them frozen over. */
+  slime?: { cells: number; underIce?: number };
   /** Ladybug goal: this many three-spot ladybugs; clear them all. */
   ladybugs?: number;
   /** Flood goal: this many watered cells to start (mirrored), `underIce` of them frozen over. */
@@ -166,26 +168,28 @@ function placeIce(p: GenParams, layout: string[], cells: number, rng: Rng): stri
   return grid.map((row) => row.join(''));
 }
 
-/** Mirrored water sources; `underIce` of them (in pairs) get 1-2 layers of ice on top. */
-function placeWater(p: GenParams, layout: string[], rng: Rng): { water?: string[]; waterIce?: string[] } {
-  if (!p.water) return {};
-  const water = layout.map((row) => [...row].map(() => '.'));
+/** A mirrored cell layer (water or slime); `underIce` of those cells (in pairs) get 1-2 layers of ice on top. */
+function placeLayer(
+  spec: { count: number; underIce?: number } | undefined, p: GenParams, layout: string[], rng: Rng,
+): { cells?: string[]; ice?: string[] } {
+  if (!spec || spec.count <= 0) return {};
+  const marks = layout.map((row) => [...row].map(() => '.'));
   const ice = layout.map((row) => [...row].map(() => '.'));
   let placed = 0;
   let frozen = 0;
-  for (let guard = 0; placed < p.water.sources && guard < 500; guard++) {
+  for (let guard = 0; placed < spec.count && guard < 500; guard++) {
     const r = rng.int(p.rows);
     const c = rng.int(Math.ceil(p.cols / 2));
     const m = mirrorCol(p.cols, c);
-    if (layout[r][c] === '-' || water[r][c] !== '.') continue;
-    water[r][c] = water[r][m] = 'x';
-    if (frozen < (p.water.underIce ?? 0) && r > 0) {
+    if (layout[r][c] === '-' || marks[r][c] !== '.') continue;
+    marks[r][c] = marks[r][m] = 'x';
+    if (frozen < (spec.underIce ?? 0) && r > 0) {
       ice[r][c] = ice[r][m] = String(1 + rng.int(2));
       frozen += c === m ? 1 : 2;
     }
     placed += c === m ? 1 : 2;
   }
-  return { water: water.map((r) => r.join('')), waterIce: frozen > 0 ? ice.map((r) => r.join('')) : undefined };
+  return { cells: marks.map((r) => r.join('')), ice: frozen > 0 ? ice.map((r) => r.join('')) : undefined };
 }
 
 function mergeIce(a: string[] | undefined, b: string[], layout: string[]): string[] {
@@ -202,7 +206,8 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const runs = p.runs ?? 40;
   const pieces = placePieces(p, layout, rng.shuffle(palette), rng);
   const iceSeed = rng.int(1_000_000);
-  const { water, waterIce } = placeWater(p, layout, rng);
+  const { cells: water, ice: waterIce } = placeLayer(p.water && { count: p.water.sources, underIce: p.water.underIce }, p, layout, rng);
+  const { cells: slime, ice: slimeIce } = placeLayer(p.slime && { count: p.slime.cells, underIce: p.slime.underIce }, p, layout, rng);
 
   const build = (count: number, moves: number): LevelDef => {
     const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
@@ -211,11 +216,10 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
     if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
     if (p.gems?.count) goals.unshift({ type: 'gems', count: p.gems.count });
     if (p.ladybugs) goals.unshift({ type: 'ladybugs', count: p.ladybugs });
-    if (water) {
-      goals.unshift({ type: 'flood' });
-      // Freeze over some sources (hazards under ice).
-      if (waterIce) ice = mergeIce(ice, waterIce, layout);
-    }
+    if (water) goals.unshift({ type: 'flood' });
+    if (slime) goals.unshift({ type: 'slime' });
+    // Freeze over some hazard cells (hazards under ice).
+    for (const extra of [waterIce, slimeIce]) if (extra) ice = mergeIce(ice, extra, layout);
     let anchorDrops: number | undefined;
     if (p.anchors) {
       anchorDrops = Math.max(0, Math.round(count * p.anchors.dropsPerSize));
@@ -232,6 +236,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
       ...(anchorDrops ? { anchorDrops } : {}),
       ...(ice ? { ice } : {}),
       ...(water ? { water } : {}),
+      ...(slime ? { slime } : {}),
       goals,
     }, 'candidate');
   };
