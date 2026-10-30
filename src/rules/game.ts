@@ -5,7 +5,7 @@ import { canCross, cellsAround, toIndex } from './board';
 import { connectableColor, enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
 import type {
-  BlastType, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, LevelDef, MoveEvent, MoveResult, Piece, Tally,
+  BlastType, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, Tally,
 } from './types';
 
 export interface GameOptions {
@@ -57,6 +57,13 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     if (playable[i] && cells[i] === null) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
   }
 
+  const ice = cells.map((_, i) => {
+    const ch = level.ice?.[Math.floor(i / cols)]?.[i % cols] ?? '.';
+    const n = ch === '.' ? 0 : Number(ch);
+    if (n > 0 && !playable[i]) throw new Error(`level ${level.id}: ice on a missing cell at index ${i}`);
+    return n;
+  });
+
   const startAnchors = cells.filter((p) => p?.kind === 'anchor').length;
   const state: GameState = {
     rows,
@@ -65,6 +72,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     wallRight,
     wallDown,
     cells,
+    layers: { ice },
     colors: level.colors.slice(),
     rng: 0,
     nextId,
@@ -132,8 +140,12 @@ export function hasMove(s: GameState, cells: Cells = s.cells): boolean {
 }
 
 /** Cells that never move: their pieces stay put and gravity stops at them. */
-function isFixed(_s: GameState, _i: number): boolean {
-  return false;
+function isFixed(s: GameState, i: number): boolean {
+  return s.layers.ice[i] > 0;
+}
+
+function cloneLayers(l: Layers): Layers {
+  return { ice: l.ice.slice() };
 }
 
 /**
@@ -169,11 +181,17 @@ class Move {
   readonly rng: Rng;
   nextId: number;
   anchorDrops: number;
+  readonly layers: Layers;
   readonly events: MoveEvent[] = [];
-  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0 };
+  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0 };
+  /** Cells whose piece was cleared this move (ice, water, fire, and slime react to these). */
+  readonly cleared = new Set<number>();
+  /** Cells a blast reached, cleared or not. */
+  readonly blasted = new Set<number>();
 
   constructor(readonly s: GameState) {
     this.cells = s.cells.slice();
+    this.layers = cloneLayers(s.layers);
     this.rng = new Rng(s.rng);
     this.nextId = s.nextId;
     this.anchorDrops = s.anchorDrops;
@@ -181,25 +199,49 @@ class Move {
 
   /** The board as it stands mid-move, for rule queries. */
   view(): GameState {
-    return { ...this.s, cells: this.cells };
+    return { ...this.s, cells: this.cells, layers: this.layers };
   }
 
   emit(e: DistributiveOmit<MoveEvent, 'board'>): void {
     this.events.push({ ...e, board: this.cells.slice() } as MoveEvent);
   }
 
-  /** Clears one cell. Returns true if a piece was removed. Anchors only leave by sinking. */
+  /**
+   * Clears one cell. Returns true if a piece was removed. Ice protects its
+   * piece; anchors only leave by sinking.
+   */
   clear(i: number): boolean {
     const p = this.cells[i];
-    if (!p || p.kind === 'anchor') return false;
+    if (!p || p.kind === 'anchor' || this.layers.ice[i] > 0) return false;
     this.cells[i] = null;
+    this.cleared.add(i);
     this.tally.collected[p.color]++;
     return true;
   }
 
   stage(kind: ClearKind, cells: Iterable<number>, sources: ClearStep['sources'] = []): void {
-    const removed = [...new Set(cells)].sort((a, b) => a - b).filter((i) => this.clear(i));
+    const all = [...new Set(cells)].sort((a, b) => a - b);
+    if (kind === 'blast') for (const i of all) this.blasted.add(i);
+    const removed = all.filter((i) => this.clear(i));
     this.emit({ kind: 'clear', step: { kind, cells: removed, sources } });
+  }
+
+  /**
+   * End-of-cascade layer effects. Ice loses one layer if a cell next to it was
+   * cleared or a blast reached it (one layer per move at most).
+   */
+  react(): void {
+    const { s, layers } = this;
+    const changed: number[] = [];
+    for (let i = 0; i < layers.ice.length; i++) {
+      if (layers.ice[i] === 0) continue;
+      const near = this.blasted.has(i) || orthogonal(s, i).some((j) => this.cleared.has(j));
+      if (!near) continue;
+      layers.ice[i]--;
+      if (layers.ice[i] === 0) this.tally.ice++;
+      changed.push(i);
+    }
+    if (changed.length > 0) this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: changed });
   }
 
   /** Line or loop, then any chain of blasts it sets off. */
@@ -207,8 +249,10 @@ class Move {
     const s = this.s;
     const view = this.view();
     const first = loop ? this.cells.flatMap((_, i) => (connectableColor(view, i) === color ? [i] : [])) : path;
-    // Dots enclosed by a loop that aren't its color become bombs.
-    const bombs = loop ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && !first.includes(i)) : [];
+    // Dots enclosed by a loop that aren't its color become bombs (frozen ones are protected).
+    const bombs = loop
+      ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && this.layers.ice[i] === 0 && !first.includes(i))
+      : [];
     this.stage(loop ? 'loop' : 'line', first);
 
     let sources: { cell: number; type: BlastType }[] = bombs.map((cell) => ({ cell, type: 'bomb' }));
@@ -236,7 +280,8 @@ class Move {
    * the fixed cell above them.
    */
   fall(): void {
-    const { s, cells, rng } = this;
+    const { cells, rng } = this;
+    const s = this.view();
     const slots: { i: number; startRow: number; top: boolean }[] = [];
     for (let c = 0; c < s.cols; c++) {
       let run: number[] = [];
@@ -306,6 +351,17 @@ class Move {
   }
 }
 
+/** Orthogonal neighbors on the board (walls don't matter here). */
+function orthogonal(s: GameState, i: number): number[] {
+  const c = i % s.cols;
+  const out: number[] = [];
+  if (i >= s.cols) out.push(i - s.cols);
+  if (i + s.cols < s.cells.length) out.push(i + s.cols);
+  if (c > 0) out.push(i - 1);
+  if (c + 1 < s.cols) out.push(i + 1);
+  return out.filter((j) => s.playable[j]);
+}
+
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
 
 function progressFor(g: GoalState, t: Tally): number {
@@ -314,6 +370,8 @@ function progressFor(g: GoalState, t: Tally): number {
       return t.collected[g.goal.color];
     case 'anchors':
       return t.anchors;
+    case 'ice':
+      return t.ice;
   }
 }
 
@@ -326,12 +384,14 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   const loop = isLoopClosed(path);
   const m = new Move(s);
   m.cascade(path, color, loop);
+  m.react();
   m.settle();
   const settled = m.cells.slice();
 
   const next: GameState = {
     ...s,
     cells: m.cells,
+    layers: m.layers,
     nextId: m.nextId,
     anchorDrops: m.anchorDrops,
     movesUsed: s.movesUsed + 1,

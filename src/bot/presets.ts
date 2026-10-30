@@ -28,4 +28,10 @@ export const presets: Record<number, Preset> = {
     collectGoals: lerp(0, 1, t), anchors: { start: lerp(1, 3, t), dropsPerSize: 1 / 6 },
     targetMoves: [lerp(12, 20, t), lerp(18, 30, t)],
   }),
+  // World 5: ice.
+  5: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: lerp(3, 5, t), holes: lerp(0, 4, t), walls: lerp(0, 2, t),
+    collectGoals: lerp(0, 1, t), ice: { perSize: 0.6, max: 16, thickness: [1, lerp(1, 3, t)] },
+    targetMoves: [lerp(10, 20, t), lerp(18, 30, t)],
+  }),
 };

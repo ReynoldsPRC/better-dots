@@ -1,6 +1,6 @@
 // Draws the board: background, connection line, dots, and effects.
 import { config } from '../config';
-import { connectableColor, type ColorId, type GameState, type Piece } from '../rules';
+import { connectableColor, type ColorId, type GameState, type Layers, type Piece } from '../rules';
 import type { Surface, Theme } from './canvas';
 import type { Frame, SpriteFrame } from './animation';
 import { toScreen, type Layout } from './layout';
@@ -104,6 +104,8 @@ export function drawScene(
     }
   }
 
+  drawIce(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
+
   for (const b of frame?.blasts ?? []) {
     const [x, y] = toScreen(layout, b.r, b.c);
     ctx.strokeStyle = withAlpha(config.ink[theme], 0.5 * (1 - b.progress));
@@ -111,6 +113,64 @@ export function drawScene(
     ctx.beginPath();
     ctx.arc(x, y, radius + cell * (state.bombRadius + 0.2) * b.progress, 0, Math.PI * 2);
     ctx.stroke();
+  }
+}
+
+/**
+ * Ice over its cell: a pale tile whose look follows thickness. 3 is fresh,
+ * 2 cracked, 1 nearly broken. Cells that just changed flash briefly.
+ */
+function drawIce(
+  ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers,
+  changed: { cell: number; progress: number }[], theme: Theme,
+) {
+  const { cell, x0, y0 } = layout;
+  const t = config.ice;
+  const size = cell * t.scale;
+  const pad = (cell - size) / 2;
+  const flash = new Map(changed.map((c) => [c.cell, c.progress]));
+  for (let i = 0; i < layers.ice.length; i++) {
+    const n = layers.ice[i];
+    const f = flash.get(i);
+    if (n === 0 && f === undefined) continue;
+    const x = x0 + (i % s.cols) * cell + pad;
+    const y = y0 + Math.floor(i / s.cols) * cell + pad;
+    if (n === 0) {
+      // Just broke: a fading shell.
+      ctx.globalAlpha = 1 - f!;
+      ctx.fillStyle = t.fill[theme][1];
+      ctx.beginPath();
+      ctx.roundRect(x - size * 0.06 * f!, y - size * 0.06 * f!, size * (1 + 0.12 * f!), size * (1 + 0.12 * f!), cell * t.radius);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    ctx.fillStyle = t.fill[theme][n];
+    ctx.strokeStyle = t.edge[theme];
+    ctx.lineWidth = cell * t.crackWidth;
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, cell * t.radius);
+    ctx.fill();
+    ctx.stroke();
+    // Cracks: more of them as the ice thins.
+    ctx.beginPath();
+    const crack = (pts: [number, number][]) => {
+      ctx.moveTo(x + pts[0][0] * size, y + pts[0][1] * size);
+      for (const [px, py] of pts.slice(1)) ctx.lineTo(x + px * size, y + py * size);
+    };
+    if (n <= 2) crack([[0.08, 0.3], [0.35, 0.42], [0.5, 0.28], [0.72, 0.4]]);
+    if (n <= 1) {
+      crack([[0.35, 0.42], [0.42, 0.7], [0.3, 0.92]]);
+      crack([[0.72, 0.4], [0.92, 0.66]]);
+      crack([[0.5, 0.28], [0.58, 0.06]]);
+    }
+    ctx.stroke();
+    if (f !== undefined) {
+      ctx.fillStyle = withAlpha('#FFFFFF', 0.5 * (1 - f));
+      ctx.beginPath();
+      ctx.roundRect(x, y, size, size, cell * t.radius);
+      ctx.fill();
+    }
   }
 }
 

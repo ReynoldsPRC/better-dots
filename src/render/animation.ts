@@ -2,7 +2,7 @@
 // falls, sinks, and (if the board was stuck) a reshuffle. Each event lasts a
 // set time; the board snapshot each event carries says where pieces end up.
 import { config } from '../config';
-import type { BlastType, Cells, ColorId, GameState, MoveEvent, MoveResult, Piece } from '../rules';
+import type { BlastType, Cells, ColorId, GameState, Layers, MoveEvent, MoveResult, Piece } from '../rules';
 import { ease } from './easing';
 
 export interface SpriteFrame {
@@ -20,6 +20,10 @@ export interface Frame {
   pulse: { color: ColorId; alpha: number } | null;
   /** Expanding rings where bombs go off; progress runs 0..1. */
   blasts: { r: number; c: number; type: BlastType; progress: number }[];
+  /** Cell layers as of this moment. */
+  layers: Layers;
+  /** Cells whose layers just changed, with 0..1 progress, for a brief flash. */
+  changed: { cell: number; progress: number }[];
   done: boolean;
 }
 
@@ -44,10 +48,12 @@ export class MoveAnimation {
   private readonly segments: Segment[] = [];
   private readonly cols: number;
   private readonly color: ColorId;
+  private readonly startLayers: Layers;
   readonly end: number;
 
   constructor(prev: GameState, result: MoveResult, _next: GameState, readonly start: number) {
     this.cols = prev.cols;
+    this.startLayers = prev.layers;
     this.color = result.color;
     const { popMs } = config.clear;
     const { speed, minMs, settleMs } = config.fall;
@@ -78,6 +84,9 @@ export class MoveAnimation {
         case 'sink':
           seg.dur = config.anchor.sinkMs;
           break;
+        case 'layers':
+          seg.dur = config.ice.crackMs;
+          break;
         case 'shuffle':
           seg.dur = config.shuffle.delayMs + config.shuffle.moveMs;
           break;
@@ -97,7 +106,14 @@ export class MoveAnimation {
 
     let pulse: Frame['pulse'] = null;
     const blasts: Frame['blasts'] = [];
+    let layers = this.startLayers;
+    const changed: Frame['changed'] = [];
     for (const s of this.segments) {
+      if (s.event.kind === 'layers' && t >= s.start) {
+        layers = s.event.layers;
+        const p = (t - s.start) / s.dur;
+        if (p < 1) for (const cell of s.event.cells) changed.push({ cell, progress: p });
+      }
       if (s.event.kind !== 'clear') continue;
       const lt = t - s.start;
       if (lt < 0) continue;
@@ -111,7 +127,7 @@ export class MoveAnimation {
         }
       }
     }
-    return { sprites, pulse, blasts, done };
+    return { sprites, pulse, blasts, layers, changed, done };
   }
 
   private still(cells: Cells): SpriteFrame[] {
@@ -161,6 +177,8 @@ export class MoveAnimation {
         }
         return out;
       }
+      case 'layers':
+        return this.still(event.board);
       case 'shuffle': {
         const from = positions(before, cols);
         const p = ease('easeInOutQuad', (lt - config.shuffle.delayMs) / config.shuffle.moveMs);

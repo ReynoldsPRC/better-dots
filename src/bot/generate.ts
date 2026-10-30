@@ -17,6 +17,11 @@ export interface GenParams {
   collectGoals: number;
   /** Anchor goal: anchors on the board at the start, plus drops that scale with goal size. */
   anchors?: { start: number; dropsPerSize: number };
+  /**
+   * Ice on about `perSize` x goal-size cells (mirrored pairs, capped at `max`), thickness
+   * in the given range; the goal is to break it all.
+   */
+  ice?: { perSize: number; max: number; thickness: [number, number] };
   /** The move limit should land in this range. */
   targetMoves: [number, number];
   /** Bot runs per measurement. */
@@ -117,6 +122,25 @@ function placePieces(p: GenParams, layout: string[], rng: Rng): PlacedPiece[] {
   return out;
 }
 
+/** Mirrored ice; avoids the top row so new dots always have somewhere to land. */
+function placeIce(p: GenParams, layout: string[], cells: number, rng: Rng): string[] | undefined {
+  if (!p.ice || cells <= 0) return undefined;
+  const grid = layout.map((row) => [...row].map(() => '.'));
+  const [lo, hi] = p.ice.thickness;
+  let placed = 0;
+  for (let guard = 0; placed < cells && guard < 500; guard++) {
+    const r = 1 + rng.int(p.rows - 1);
+    const c = rng.int(Math.ceil(p.cols / 2));
+    const m = mirrorCol(p.cols, c);
+    if (layout[r][c] === '-' || grid[r][c] !== '.') continue;
+    const n = String(lo + rng.int(hi - lo + 1));
+    grid[r][c] = n;
+    grid[r][m] = n;
+    placed += c === m ? 1 : 2;
+  }
+  return grid.map((row) => row.join(''));
+}
+
 /** Builds one candidate, or null if the bot couldn't make it fit the target. */
 export function generateCandidate(p: GenParams, seed: number, name?: string): Candidate | null {
   const rng = new Rng(seedRng(seed));
@@ -126,9 +150,13 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const goalColors = rng.shuffle(palette).slice(0, p.collectGoals).sort((a, b) => a - b);
   const runs = p.runs ?? 40;
   const pieces = placePieces(p, layout, rng);
+  const iceSeed = rng.int(1_000_000);
 
   const build = (count: number, moves: number): LevelDef => {
     const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
+    const ice = p.ice ? placeIce(p, layout, Math.min(p.ice.max, Math.round(count * p.ice.perSize)), new Rng(seedRng(iceSeed))) : undefined;
+    const iceCount = ice ? ice.join('').replace(/\./g, '').length : 0;
+    if (iceCount > 0) goals.unshift({ type: 'ice', count: iceCount });
     let anchorDrops: number | undefined;
     if (p.anchors) {
       anchorDrops = Math.max(0, Math.round(count * p.anchors.dropsPerSize));
@@ -143,6 +171,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
       ...(walls.length ? { walls } : {}),
       ...(pieces.length ? { pieces } : {}),
       ...(anchorDrops ? { anchorDrops } : {}),
+      ...(ice ? { ice } : {}),
       goals,
     }, 'candidate');
   };

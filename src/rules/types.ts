@@ -34,7 +34,14 @@ export type PlacedPiece = { r: number; c: number; type: 'anchor' };
 
 export type Goal =
   | { type: 'collect'; color: ColorId; count: number }
-  | { type: 'anchors'; count: number };
+  | { type: 'anchors'; count: number }
+  | { type: 'ice'; count: number };
+
+/** Per-cell layers, separate from the pieces. */
+export interface Layers {
+  /** Ice thickness, 0-3. A frozen cell's piece is locked in place and can't be connected. */
+  ice: number[];
+}
 
 export interface GoalState {
   goal: Goal;
@@ -60,6 +67,8 @@ export interface LevelDef {
   pieces?: PlacedPiece[];
   /** How many more anchors drop in from the top over the level. */
   anchorDrops?: number;
+  /** Ice thickness per cell: one string per row, '.' none or '1'-'3'. */
+  ice?: string[];
   goals: Goal[];
   /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
   stars?: { two: number; three: number };
@@ -74,6 +83,7 @@ export interface GameState {
   wallRight: boolean[];
   wallDown: boolean[];
   cells: Cells;
+  layers: Layers;
   /** Colors that can appear on this board. */
   colors: ColorId[];
   rng: RngState;
@@ -97,6 +107,8 @@ export interface GameState {
 export interface Tally {
   collected: number[];
   anchors: number;
+  /** Ice cells broken all the way through. */
+  ice: number;
 }
 
 export type ClearKind = 'line' | 'loop' | 'blast';
@@ -121,6 +133,8 @@ export type MoveEvent = { board: Cells } & (
   | { kind: 'fall'; spawnFrom: Record<number, number> }
   /** Anchors that reached the bottom and were removed. */
   | { kind: 'sink'; cells: number[] }
+  /** Cell layers changed (ice cracked, ...). `layers` is the new state; `cells` are the ones that changed. */
+  | { kind: 'layers'; layers: Layers; cells: number[] }
   | { kind: 'shuffle' }
 );
 

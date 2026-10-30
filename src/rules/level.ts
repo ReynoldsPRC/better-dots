@@ -69,6 +69,23 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
   }
   const startAnchors = (pieces ?? []).filter((p) => p.type === 'anchor').length;
 
+  /** An optional per-cell grid with the same shape as the layout. */
+  const grid = (key: string, allowed: RegExp, what: string): string[] | undefined => {
+    const g = o[key];
+    if (g === undefined) return undefined;
+    if (!Array.isArray(g) || g.length !== rows.length || !g.every((r) => typeof r === 'string' && r.length === rows[0].length)) {
+      fail(`"${key}" must have the same rows and columns as "layout"`);
+    }
+    (g as string[]).forEach((row, r) => [...row].forEach((ch, c) => {
+      if (ch === '.') return;
+      if (!allowed.test(ch)) fail(`"${key}" has ${JSON.stringify(ch)} at row ${r}, col ${c} (use "." or ${what})`);
+      if (rows[r][c] === '-') fail(`"${key}" marks row ${r}, col ${c}, which is not a cell`);
+    }));
+    return (g as string[]).slice();
+  };
+  const ice = grid('ice', /^[1-3]$/, '1-3 for thickness');
+  const iceCells = (ice ?? []).join('').replace(/\./g, '').length;
+
   let anchorDrops: number | undefined;
   if (o.anchorDrops !== undefined) {
     if (!isInt(o.anchorDrops) || o.anchorDrops < 0) fail('"anchorDrops" must be a whole number');
@@ -90,6 +107,11 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
         const count = positive(go.count, k);
         if (count > startAnchors + (anchorDrops ?? 0)) fail(`goal ${k}: needs ${count} anchors but the level only has ${startAnchors + (anchorDrops ?? 0)}`);
         return { type: 'anchors', count };
+      }
+      case 'ice': {
+        const count = positive(go.count, k);
+        if (count > iceCells) fail(`goal ${k}: needs ${count} ice but the level only has ${iceCells}`);
+        return { type: 'ice', count };
       }
       default:
         return fail(`goal ${k}: unknown type ${JSON.stringify(go?.type)}`);
@@ -115,6 +137,7 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     walls,
     pieces,
     anchorDrops,
+    ice,
     goals,
     stars,
   };

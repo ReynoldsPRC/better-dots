@@ -96,13 +96,15 @@ function findLoop(s: GameState, group: number[]): number[] | null {
 
 /**
  * Cells worth clearing for reasons a plain "clear the most" search misses:
- * the cells under anchors (so they drop).
+ * the cells under anchors (so they drop) and next to ice (to crack it).
  */
 export function targetCells(s: GameState): Set<number> {
   const out = new Set<number>();
   s.cells.forEach((p, i) => {
-    if (p?.kind !== 'anchor') return;
-    for (let j = i + s.cols; j < s.cells.length; j += s.cols) if (s.cells[j]) out.add(j);
+    if (p?.kind === 'anchor') {
+      for (let j = i + s.cols; j < s.cells.length; j += s.cols) if (s.cells[j]) out.add(j);
+    }
+    if (s.layers.ice[i] > 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
   });
   return out;
 }
@@ -157,9 +159,13 @@ export function progressScore(before: GameState, after: GameState, startRemainin
     score += (was - now) * share;
     // Anchors: reward moving them down, a fraction of what sinking one is worth.
     if (g.goal.type === 'anchors' && now > 0) score += 0.8 * share * anchorDescent(before, after);
+    // Ice: partial credit for each layer knocked off.
+    if (g.goal.type === 'ice' && now > 0) score += 0.3 * share * (iceLayers(before) - iceLayers(after));
   });
   return score;
 }
+
+const iceLayers = (s: GameState) => s.layers.ice.reduce((a, b) => a + b, 0);
 
 /** How many rows the anchors on both boards moved down, as a fraction of board height. */
 function anchorDescent(before: GameState, after: GameState): number {

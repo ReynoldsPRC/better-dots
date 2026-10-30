@@ -73,6 +73,19 @@ export const config = {
     sinkMs: 320,
   },
 
+  ice: {
+    /** Ice tint per thickness (index 1-3), light and dark themes. Alpha is in the color. */
+    fill: { light: ['', '#C9DCE8A0', '#C2D8E6C0', '#BDD5E6E0'], dark: ['', '#8FB3CC70', '#94B8D29A', '#9ABED8C4'] },
+    edge: { light: '#9FBFD4', dark: '#B5D2E6' },
+    /** Tile size and corner radius as fractions of cell size. */
+    scale: 0.86,
+    radius: 0.2,
+    /** Crack line width as a fraction of cell size. */
+    crackWidth: 0.025,
+    /** Pause while ice cracks after a move. */
+    crackMs: 220,
+  },
+
   shuffle: {
     /** Pause before an automatic reshuffle, then how long dots take to swap places. */
     delayMs: 250,
