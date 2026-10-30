@@ -14,5 +14,7 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 20 },
     { "type": "collect", "color": 2, "count": 20 }
-  ]
+  ],
+  "stars": { "two": 12, "three": 10 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 13, "p10": 10 }
 }

@@ -1,7 +1,7 @@
 {
   "name": "Big board",
   "seed": 1009,
-  "moves": 30,
+  "moves": 39,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -15,5 +15,7 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 26 },
     { "type": "collect", "color": 3, "count": 26 }
-  ]
+  ],
+  "stars": { "two": 33, "three": 28 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 34, "p10": 28 }
 }

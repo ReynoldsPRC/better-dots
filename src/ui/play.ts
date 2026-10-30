@@ -5,7 +5,7 @@ import { drawScene, type DragView } from '../render/board';
 import { fitCanvas, type Surface } from '../render/canvas';
 import { cellAt, computeLayout, type Layout } from '../render/layout';
 import {
-  addMoves, applyMove, extendPath, goalDone, isLoopClosed, isValidPath, movesLeft,
+  addMoves, applyMove, extendPath, goalDone, goalRemaining, isLoopClosed, isValidPath, movesLeft,
   type GameState,
 } from '../rules';
 import { currentTheme, dotIcon, el } from './dom';
@@ -71,9 +71,9 @@ export class PlayScreen {
     const cb = this.hooks.colorblind();
     this.hud.goals.replaceChildren(
       ...s.goals.map((g) =>
-        el('div', { class: `goal${goalDone(g) ? ' done' : ''}` },
+        el('div', { class: `goal${goalDone(s, g) ? ' done' : ''}` },
           dotIcon(g.goal.color, cb),
-          el('span', {}, goalDone(g) ? '✓' : String(g.goal.count - g.progress)),
+          el('span', {}, goalDone(s, g) ? '✓' : String(goalRemaining(s, g))),
         ),
       ),
     );

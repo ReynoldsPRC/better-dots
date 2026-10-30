@@ -1,7 +1,7 @@
 {
   "name": "Everything",
   "seed": 1010,
-  "moves": 35,
+  "moves": 28,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -18,5 +18,7 @@
     { "type": "collect", "color": 2, "count": 22 },
     { "type": "collect", "color": 3, "count": 22 },
     { "type": "collect", "color": 4, "count": 22 }
-  ]
+  ],
+  "stars": { "two": 21, "three": 13 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 22, "p10": 13 }
 }

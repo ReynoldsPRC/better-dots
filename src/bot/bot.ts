@@ -1,0 +1,243 @@
+// The level-testing bot: randomized greedy. Each turn it lists a handful of
+// candidate moves (per same-color group: a loop if one exists, and the longest
+// line it finds), plays each one on a copy of the board, scores the result by
+// goal progress, and picks the best with a little noise.
+// Pure and seeded like the rules, so runs are reproducible.
+import {
+  applyMove, canLink, createGame, goalRemaining, Rng, seedRng,
+  type GameState, type LevelDef,
+} from '../rules';
+
+export interface BotOptions {
+  /** Noise added to each candidate's score (0 = always the same choice). */
+  noise?: number;
+  /** Search budget per group when looking for long lines. */
+  pathBudget?: number;
+}
+
+const DEFAULTS: Required<BotOptions> = { noise: 0.15, pathBudget: 400 };
+
+/** Same-color groups of cells a line could run through. */
+function groups(s: GameState): number[][] {
+  const seen = new Set<number>();
+  const out: number[][] = [];
+  for (let i = 0; i < s.cells.length; i++) {
+    if (seen.has(i) || !s.cells[i]) continue;
+    const group: number[] = [];
+    const stack = [i];
+    seen.add(i);
+    while (stack.length) {
+      const a = stack.pop()!;
+      group.push(a);
+      for (const b of neighbors(s, a)) {
+        if (!seen.has(b) && canLink(s, a, b)) {
+          seen.add(b);
+          stack.push(b);
+        }
+      }
+    }
+    if (group.length >= 2) out.push(group);
+  }
+  return out;
+}
+
+function neighbors(s: GameState, i: number): number[] {
+  const c = i % s.cols;
+  const out: number[] = [];
+  if (i >= s.cols) out.push(i - s.cols);
+  if (i + s.cols < s.cells.length) out.push(i + s.cols);
+  if (c > 0) out.push(i - 1);
+  if (c + 1 < s.cols) out.push(i + 1);
+  return out;
+}
+
+/** A closed loop inside the group, if there is one. */
+function findLoop(s: GameState, group: number[]): number[] | null {
+  const inGroup = new Set(group);
+  const parent = new Map<number, number>();
+  const depth = new Map<number, number>();
+  for (const root of group) {
+    if (depth.has(root)) continue;
+    depth.set(root, 0);
+    parent.set(root, -1);
+    const stack = [root];
+    while (stack.length) {
+      const a = stack.pop()!;
+      for (const b of neighbors(s, a)) {
+        if (!inGroup.has(b) || !canLink(s, a, b) || b === parent.get(a)) continue;
+        if (!depth.has(b)) {
+          depth.set(b, depth.get(a)! + 1);
+          parent.set(b, a);
+          stack.push(b);
+        } else {
+          // A non-tree edge a-b: climb from both ends to their common
+          // ancestor, then close the cycle back at a.
+          const fromA: number[] = [];
+          const fromB: number[] = [];
+          let x = a;
+          let y = b;
+          while (x !== y) {
+            if (depth.get(x)! >= depth.get(y)!) {
+              fromA.push(x);
+              x = parent.get(x)!;
+            } else {
+              fromB.push(y);
+              y = parent.get(y)!;
+            }
+          }
+          const loop = [...fromA, x, ...fromB.reverse(), a];
+          if (loop.length >= 5) return loop;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/** The longest simple line found within a search budget. */
+function longestLine(s: GameState, group: number[], budget: number): number[] {
+  const inGroup = new Set(group);
+  let best: number[] = [];
+  let steps = 0;
+  const path: number[] = [];
+  const onPath = new Set<number>();
+  const dfs = (a: number) => {
+    path.push(a);
+    onPath.add(a);
+    if (path.length > best.length) best = path.slice();
+    for (const b of neighbors(s, a)) {
+      if (steps++ > budget || best.length === group.length) break;
+      if (inGroup.has(b) && !onPath.has(b) && canLink(s, a, b)) dfs(b);
+    }
+    path.pop();
+    onPath.delete(a);
+  };
+  for (const start of group) {
+    if (steps > budget || best.length === group.length) break;
+    dfs(start);
+  }
+  return best;
+}
+
+export function candidateMoves(s: GameState, budget = DEFAULTS.pathBudget): number[][] {
+  const out: number[][] = [];
+  for (const g of groups(s)) {
+    const loop = g.length >= 4 ? findLoop(s, g) : null;
+    if (loop) out.push(loop);
+    out.push(g.length === 2 ? g : longestLine(s, g, budget));
+  }
+  return out;
+}
+
+/**
+ * Score for the board after a move: goal progress (each goal normalized by its
+ * starting size), plus a nudge for clearing more.
+ */
+export function progressScore(before: GameState, after: GameState, startRemaining: number[]): number {
+  let score = 0;
+  after.goals.forEach((g, k) => {
+    const was = goalRemaining(before, before.goals[k]);
+    const now = goalRemaining(after, g);
+    score += (was - now) / Math.max(1, startRemaining[k]);
+  });
+  return score;
+}
+
+export interface RunResult {
+  won: boolean;
+  /** Moves the bot needed to meet every goal (or the moves it used before giving up). */
+  movesUsed: number;
+}
+
+/**
+ * Plays one game. `moveCap` overrides the level's limit so the bot can report
+ * how many moves it actually needed.
+ */
+export function playOnce(level: LevelDef, playSeed: number, moveCap?: number, opts: BotOptions = {}): RunResult {
+  const o = { ...DEFAULTS, ...opts };
+  const rng = new Rng(seedRng(playSeed * 7919 + 17));
+  let s = createGame(level, { playSeed });
+  if (moveCap !== undefined) s = { ...s, moveLimit: moveCap };
+  const startRemaining = s.goals.map((g) => goalRemaining(s, g));
+
+  while (s.status === 'playing') {
+    const moves = candidateMoves(s, o.pathBudget);
+    let best: GameState | null = null;
+    let bestScore = -Infinity;
+    for (const path of moves) {
+      const { state, result } = applyMove(s, path);
+      const cleared = result.steps.reduce((n, st) => n + st.cells.length, 0);
+      const score =
+        (state.status === 'won' ? 100 : 0) +
+        progressScore(s, state, startRemaining) +
+        0.002 * cleared +
+        o.noise * rng.float() * 0.1;
+      if (score > bestScore) {
+        bestScore = score;
+        best = state;
+      }
+    }
+    s = best!;
+  }
+  return { won: s.status === 'won', movesUsed: s.movesUsed };
+}
+
+export interface LevelStats {
+  runs: number;
+  /** Share of runs the bot finished within the level's move limit. */
+  winRate: number;
+  /** Share of runs the bot finished at all (with a generous move cap). */
+  finishRate: number;
+  /** Moves needed in finished runs, ascending. */
+  movesNeeded: number[];
+  median: number;
+  p10: number;
+  p75: number;
+}
+
+export function percentile(sorted: number[], q: number): number {
+  if (sorted.length === 0) return NaN;
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1))];
+}
+
+/** Runs the bot many times with a generous cap and summarizes how many moves it needed. */
+export function analyzeLevel(level: LevelDef, runs = 100, seed = 1, opts: BotOptions = {}): LevelStats {
+  const cap = Math.max(level.moves * 3, 60);
+  const needed: number[] = [];
+  for (let k = 0; k < runs; k++) {
+    const r = playOnce(level, seed + k, cap, opts);
+    if (r.won) needed.push(r.movesUsed);
+  }
+  needed.sort((a, b) => a - b);
+  // Failed runs count as "needed more than the cap" for percentiles.
+  const all = [...needed, ...new Array(runs - needed.length).fill(Infinity)];
+  return {
+    runs,
+    winRate: needed.filter((m) => m <= level.moves).length / runs,
+    finishRate: needed.length / runs,
+    movesNeeded: needed,
+    median: percentile(all, 0.5),
+    p10: percentile(all, 0.1),
+    p75: percentile(all, 0.75),
+  };
+}
+
+export interface Tuning {
+  moves: number;
+  stars: { two: number; three: number };
+}
+
+/** Bot share of runs that should fit in the move limit. */
+export const TARGET_WIN_RATE = 0.75;
+
+/**
+ * Move limit and star cutoffs from bot results: the limit fits ~75% of bot
+ * runs; 2 stars for beating the bot's median; 3 for matching its best 10%.
+ */
+export function tuneFromStats(stats: LevelStats): Tuning | null {
+  if (stats.finishRate < TARGET_WIN_RATE || !Number.isFinite(stats.p75)) return null;
+  const moves = stats.p75;
+  const two = Math.max(1, Math.min(moves, stats.median - 1));
+  const three = Math.max(1, Math.min(two, stats.p10));
+  return { moves, stars: { two, three } };
+}

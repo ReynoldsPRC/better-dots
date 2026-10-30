@@ -1,7 +1,7 @@
 {
   "name": "Taller",
   "seed": 1006,
-  "moves": 25,
+  "moves": 29,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -15,5 +15,7 @@
   "goals": [
     { "type": "collect", "color": 1, "count": 32 },
     { "type": "collect", "color": 2, "count": 32 }
-  ]
+  ],
+  "stars": { "two": 26, "three": 20 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 27, "p10": 20 }
 }

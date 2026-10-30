@@ -1,7 +1,7 @@
 {
   "name": "Pillars",
   "seed": 2004,
-  "moves": 22,
+  "moves": 21,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -16,5 +16,7 @@
     { "type": "collect", "color": 0, "count": 13 },
     { "type": "collect", "color": 1, "count": 13 },
     { "type": "collect", "color": 2, "count": 13 }
-  ]
+  ],
+  "stars": { "two": 18, "three": 17 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 19, "p10": 17 }
 }

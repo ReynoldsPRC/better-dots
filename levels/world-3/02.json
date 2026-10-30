@@ -1,7 +1,7 @@
 {
   "name": "Halves",
   "seed": 3002,
-  "moves": 20,
+  "moves": 21,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -22,5 +22,7 @@
   "goals": [
     { "type": "collect", "color": 1, "count": 20 },
     { "type": "collect", "color": 2, "count": 20 }
-  ]
+  ],
+  "stars": { "two": 18, "three": 16 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 19, "p10": 16 }
 }

@@ -1,0 +1,21 @@
+{
+  "seed": 373084,
+  "moves": 20,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    "......."
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 12 },
+    { "type": "collect", "color": 3, "count": 12 },
+    { "type": "collect", "color": 4, "count": 12 }
+  ],
+  "stars": { "two": 16, "three": 13 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 17, "p10": 13 }
+}

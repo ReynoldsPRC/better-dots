@@ -1,0 +1,110 @@
+import { describe, expect, it } from 'vitest';
+import { analyzeLevel, candidateMoves, percentile, playOnce, tuneFromStats, type LevelStats } from '../src/bot/bot';
+import { formatLevelJson, toLevelFile } from '../src/bot/format';
+import { generateCandidate } from '../src/bot/generate';
+import { candidates, catalog } from '../src/levels';
+import { createGame, isLoopClosed, isValidPath, parseLevel, type LevelDef } from '../src/rules';
+
+const easy: LevelDef = {
+  id: 'easy', seed: 3, moves: 30, colors: [0, 1, 2], layout: Array(6).fill('......'),
+  goals: [{ type: 'collect', color: 0, count: 10 }],
+};
+
+describe('bot', () => {
+  it('only proposes legal moves, including a loop when one exists', () => {
+    const s = createGame({ ...easy, layout: ['001', '001', '110'] });
+    const moves = candidateMoves(s);
+    for (const m of moves) expect(isValidPath(s, m)).toBe(true);
+    expect(moves.some(isLoopClosed)).toBe(true);
+  });
+
+  it('finds lines on shaped and walled boards', () => {
+    const level = catalog.byId.get('3-6')!;
+    const s = createGame(level);
+    for (const m of candidateMoves(s)) expect(isValidPath(s, m)).toBe(true);
+  });
+
+  it('is reproducible for the same seed', () => {
+    expect(playOnce(easy, 9)).toEqual(playOnce(easy, 9));
+  });
+
+  it('wins an easy level and loses an impossible one', () => {
+    expect(playOnce(easy, 1).won).toBe(true);
+    const impossible = { ...easy, moves: 2, goals: [{ type: 'collect' as const, color: 0 as const, count: 500 }] };
+    expect(playOnce(impossible, 1)).toEqual({ won: false, movesUsed: 2 });
+  });
+
+  it('reports how many moves it needed, using a generous cap', () => {
+    const stats = analyzeLevel({ ...easy, moves: 1 }, 10, 1);
+    expect(stats.finishRate).toBe(1);
+    expect(stats.winRate).toBe(0);
+    expect(stats.movesNeeded.length).toBe(10);
+    expect(stats.p10).toBeLessThanOrEqual(stats.median);
+    expect(stats.median).toBeLessThanOrEqual(stats.p75);
+  });
+});
+
+describe('tuning from bot results', () => {
+  const stats = (needed: number[], runs = needed.length): LevelStats => {
+    const sorted = [...needed].sort((a, b) => a - b);
+    const all = [...sorted, ...Array(runs - sorted.length).fill(Infinity)];
+    return {
+      runs, winRate: 0, finishRate: sorted.length / runs, movesNeeded: sorted,
+      median: percentile(all, 0.5), p10: percentile(all, 0.1), p75: percentile(all, 0.75),
+    };
+  };
+
+  it('sets the move limit at the 75th percentile and stars from the median and best 10%', () => {
+    const t = tuneFromStats(stats([10, 11, 12, 13, 14, 15, 16, 17, 18, 19]))!;
+    expect(t.moves).toBe(17);
+    expect(t.stars).toEqual({ two: 13, three: 10 });
+  });
+
+  it('treats a level the bot rarely finishes as unwinnable', () => {
+    expect(tuneFromStats(stats([10, 12], 10))).toBeNull();
+  });
+
+  it('keeps 1 <= three <= two <= moves', () => {
+    const t = tuneFromStats(stats([2, 2, 2, 2]))!;
+    expect(t.stars.three).toBeLessThanOrEqual(t.stars.two);
+    expect(t.stars.two).toBeLessThanOrEqual(t.moves);
+    expect(t.stars.three).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('generator', () => {
+  const params = {
+    rows: 7, cols: 6, colors: 4, holes: 6, walls: 4, collectGoals: 2, targetMoves: [12, 30] as [number, number], runs: 12,
+  };
+
+  it('makes valid, reproducible levels within the move target', () => {
+    const a = generateCandidate(params, 42);
+    const b = generateCandidate(params, 42);
+    expect(a).not.toBeNull();
+    expect(a).toEqual(b);
+    const level = a!.level;
+    expect(() => parseLevel(toLevelFile(level), 'x')).not.toThrow();
+    expect(level.moves).toBeGreaterThanOrEqual(12);
+    expect(level.stars!.three).toBeLessThanOrEqual(level.stars!.two);
+  });
+
+  it('mirrors holes and keeps every column and the whole board connected', () => {
+    const level = generateCandidate(params, 7)!.level;
+    for (const row of level.layout) expect(row).toBe([...row].reverse().join(''));
+    for (let c = 0; c < 6; c++) expect(level.layout.some((row) => row[c] !== '-')).toBe(true);
+    expect(level.layout.join('').split('-').length - 1).toBe(6);
+  });
+});
+
+describe('level files', () => {
+  it('format round-trips through the parser', () => {
+    for (const level of [...catalog.order, ...candidates.order]) {
+      const text = formatLevelJson(toLevelFile(level));
+      expect(parseLevel(JSON.parse(text), level.id)).toEqual(level);
+    }
+  });
+
+  it('every shipped level has bot-set stars', () => {
+    for (const level of catalog.order) expect(level.stars, level.id).toBeDefined();
+  });
+});

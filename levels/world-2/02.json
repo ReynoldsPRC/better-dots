@@ -1,7 +1,7 @@
 {
   "name": "Courtyard",
   "seed": 2002,
-  "moves": 20,
+  "moves": 23,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -14,5 +14,7 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 15 },
     { "type": "collect", "color": 2, "count": 15 }
-  ]
+  ],
+  "stars": { "two": 19, "three": 16 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 20, "p10": 16 }
 }

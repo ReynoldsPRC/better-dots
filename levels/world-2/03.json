@@ -1,7 +1,7 @@
 {
   "name": "Diamond",
   "seed": 2003,
-  "moves": 22,
+  "moves": 21,
   "colors": [0, 1, 2, 3],
   "layout": [
     "---.---",
@@ -15,5 +15,7 @@
   "goals": [
     { "type": "collect", "color": 1, "count": 16 },
     { "type": "collect", "color": 3, "count": 16 }
-  ]
+  ],
+  "stars": { "two": 18, "three": 14 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 19, "p10": 14 }
 }

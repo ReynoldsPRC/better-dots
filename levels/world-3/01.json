@@ -1,7 +1,7 @@
 {
   "name": "Fence",
   "seed": 3001,
-  "moves": 16,
+  "moves": 8,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -19,5 +19,7 @@
   ],
   "goals": [
     { "type": "collect", "color": 0, "count": 18 }
-  ]
+  ],
+  "stars": { "two": 6, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.87, "median": 7, "p10": 4 }
 }

@@ -1,7 +1,7 @@
 {
   "name": "Comb",
   "seed": 3004,
-  "moves": 22,
+  "moves": 27,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -30,5 +30,7 @@
     { "type": "collect", "color": 1, "count": 20 },
     { "type": "collect", "color": 2, "count": 20 },
     { "type": "collect", "color": 3, "count": 20 }
-  ]
+  ],
+  "stars": { "two": 23, "three": 17 },
+  "bot": { "runs": 100, "winRate": 0.8, "median": 24, "p10": 17 }
 }

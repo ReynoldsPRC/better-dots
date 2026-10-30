@@ -1,0 +1,33 @@
+{
+  "seed": 451997,
+  "moves": 28,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    "...-...",
+    ".......",
+    ".-...-."
+  ],
+  "walls": [
+    { "r": 0, "c": 1, "side": "right" },
+    { "r": 0, "c": 4, "side": "right" },
+    { "r": 1, "c": 2, "side": "down" },
+    { "r": 1, "c": 4, "side": "down" },
+    { "r": 5, "c": 1, "side": "right" },
+    { "r": 5, "c": 4, "side": "right" },
+    { "r": 5, "c": 0, "side": "right" },
+    { "r": 5, "c": 5, "side": "right" },
+    { "r": 0, "c": 2, "side": "right" },
+    { "r": 0, "c": 3, "side": "right" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 12 },
+    { "type": "collect", "color": 2, "count": 12 },
+    { "type": "collect", "color": 4, "count": 12 }
+  ],
+  "stars": { "two": 24, "three": 20 },
+  "bot": { "runs": 100, "winRate": 0.83, "median": 25, "p10": 20 }
+}

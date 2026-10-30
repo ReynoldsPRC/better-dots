@@ -1,4 +1,4 @@
-import { catalog } from './levels';
+import { candidates, catalog } from './levels';
 import { isUnlocked, recordWin, type SaveData } from './progress';
 import { createGame, starsFor, type GameState, type LevelDef } from './rules';
 import { el } from './ui/dom';
@@ -34,12 +34,15 @@ function showSelect(): void {
   current = null;
   $('play').hidden = true;
   $('select').hidden = false;
-  renderSelect($('worlds'), catalog, { ...save, settings: { ...save.settings, devUnlock: devUnlock() } }, startLevel);
+  renderSelect(
+    $('worlds'), catalog, { ...save, settings: { ...save.settings, devUnlock: devUnlock() } }, startLevel,
+    devUnlock() ? candidates : undefined,
+  );
 }
 
 function startLevel(id: string): void {
-  const level = catalog.byId.get(id);
-  if (!level || !isUnlocked(save, order, id, devUnlock())) return;
+  const level = catalog.byId.get(id) ?? (devUnlock() ? candidates.byId.get(id) : undefined);
+  if (!level || !(level.id.startsWith('c') || isUnlocked(save, order, id, devUnlock()))) return;
   hideCard();
   current = level;
   $('select').hidden = true;

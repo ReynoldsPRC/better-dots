@@ -10,7 +10,8 @@
     "preview": "vite preview --host",
     "test": "vitest run",
     "test:watch": "vitest",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "levels": "vite-node scripts/levels.ts --"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

@@ -1,7 +1,7 @@
 {
   "name": "The box",
   "seed": 3003,
-  "moves": 20,
+  "moves": 21,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -24,5 +24,7 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 18 },
     { "type": "collect", "color": 3, "count": 18 }
-  ]
+  ],
+  "stars": { "two": 17, "three": 13 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 18, "p10": 13 }
 }

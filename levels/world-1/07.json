@@ -1,7 +1,7 @@
 {
   "name": "Five colors",
   "seed": 1007,
-  "moves": 25,
+  "moves": 19,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     "......",
@@ -14,5 +14,7 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 20 },
     { "type": "collect", "color": 4, "count": 20 }
-  ]
+  ],
+  "stars": { "two": 15, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 16, "p10": 11 }
 }

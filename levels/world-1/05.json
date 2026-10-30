@@ -1,7 +1,7 @@
 {
   "name": "Three goals",
   "seed": 1005,
-  "moves": 25,
+  "moves": 26,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -15,5 +15,7 @@
     { "type": "collect", "color": 0, "count": 22 },
     { "type": "collect", "color": 2, "count": 22 },
     { "type": "collect", "color": 3, "count": 22 }
-  ]
+  ],
+  "stars": { "two": 22, "three": 19 },
+  "bot": { "runs": 100, "winRate": 0.8, "median": 23, "p10": 19 }
 }

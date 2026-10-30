@@ -1,0 +1,26 @@
+{
+  "seed": 698493,
+  "moves": 19,
+  "colors": [0, 1, 4],
+  "layout": [
+    "-....-",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "walls": [
+    { "r": 4, "c": 0, "side": "down" },
+    { "r": 4, "c": 5, "side": "down" },
+    { "r": 2, "c": 0, "side": "right" },
+    { "r": 2, "c": 4, "side": "right" },
+    { "r": 1, "c": 1, "side": "down" },
+    { "r": 1, "c": 4, "side": "down" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 4, "count": 33 }
+  ],
+  "stars": { "two": 16, "three": 12 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 17, "p10": 12 }
+}

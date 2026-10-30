@@ -91,8 +91,13 @@ export function movesLeft(s: GameState): number {
   return s.moveLimit + s.extraMoves - s.movesUsed;
 }
 
-export function goalDone(g: GoalState): boolean {
-  return g.progress >= g.goal.count;
+/** How much of a goal is left (0 when met). */
+export function goalRemaining(_s: GameState, g: GoalState): number {
+  return Math.max(0, g.goal.count - g.progress);
+}
+
+export function goalDone(s: GameState, g: GoalState): boolean {
+  return goalRemaining(s, g) === 0;
 }
 
 /** True if any two adjacent dots share a color. */
@@ -206,7 +211,7 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
     movesUsed: s.movesUsed + 1,
     goals,
   };
-  if (goals.length > 0 && goals.every(goalDone)) next.status = 'won';
+  if (goals.length > 0 && goals.every((g) => goalDone(next, g))) next.status = 'won';
   else if (movesLeft(next) <= 0) next.status = 'lost';
 
   let shuffled = false;
