@@ -39,14 +39,14 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
         playable.push(true);
         cells.push({ kind: 'dot', id: nextId++, color: Number(ch) as ColorId });
       } else {
-        throw new Error(`level ${level.id}: bad layout character ${JSON.stringify(ch)} at row ${r}, col ${c}`);
+        throw new Error(`level ${level.label}: bad layout character ${JSON.stringify(ch)} at row ${r}, col ${c}`);
       }
     }
   }
 
   for (const p of level.pieces ?? []) {
     const i = p.r * cols + p.c;
-    if (!playable[i]) throw new Error(`level ${level.id}: piece at row ${p.r}, col ${p.c} is not on a cell`);
+    if (!playable[i]) throw new Error(`level ${level.label}: piece at row ${p.r}, col ${p.c} is not on a cell`);
     cells[i] =
       p.type === 'anchor' ? { kind: 'anchor', id: nextId++ } :
       p.type === 'gem' ? { kind: 'gem', id: nextId++, color: p.color, shape: p.shape } :
@@ -64,7 +64,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   const ice = cells.map((_, i) => {
     const ch = level.ice?.[Math.floor(i / cols)]?.[i % cols] ?? '.';
     const n = ch === '.' ? 0 : Number(ch);
-    if (n > 0 && !playable[i]) throw new Error(`level ${level.id}: ice on a missing cell at index ${i}`);
+    if (n > 0 && !playable[i]) throw new Error(`level ${level.label}: ice on a missing cell at index ${i}`);
     return n;
   });
 
@@ -111,7 +111,7 @@ function placeWalls(level: LevelDef, rows: number, cols: number) {
       w.side === 'down' ? [w.r, w.c, wallDown] :
       [w.r - 1, w.c, wallDown];
     const inside = r >= 0 && c >= 0 && r < rows && c < cols && (flags === wallRight ? c + 1 < cols : r + 1 < rows);
-    if (!inside) throw new Error(`level ${level.id}: wall ${JSON.stringify(w)} is not between two cells`);
+    if (!inside) throw new Error(`level ${level.label}: wall ${JSON.stringify(w)} is not between two cells`);
     flags[r * cols + c] = true;
   }
   return { wallRight, wallDown };

@@ -78,7 +78,7 @@ describe('gems', () => {
   });
 
   it('level files: gems and gem goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
     const ok = parseLevel({ ...base, pieces: [gem(0, 0, 1, 'cross')], goals: [{ type: 'gems', count: 1 }] }, 'x');
     expect(ok.pieces).toEqual([gem(0, 0, 1, 'cross')]);
     expect(() => parseLevel({ ...base, pieces: [gem(0, 0, 3, 'cross')], goals: [{ type: 'gems', count: 1 }] }, 'x')).toThrow(/gem color/);

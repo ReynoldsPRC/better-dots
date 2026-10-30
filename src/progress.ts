@@ -1,10 +1,11 @@
-// Saved progress: what's cleared, stars, settings. Pure functions over a plain
+// Saved progress: what's cleared, best moves, settings. Pure functions over a plain
 // object; src/ui/storage.ts persists it to localStorage and handles export/import.
+// Records are keyed on each level's stable id, so renumbering level files doesn't
+// move progress between levels. Stars aren't stored: they're derived from the best
+// moves and the level's current thresholds, so retuning a level updates them.
 
 export interface LevelRecord {
-  /** Best stars earned without the assist (0 if only ever cleared with it). */
-  stars: 0 | 1 | 2 | 3;
-  /** Fewest moves in an unassisted clear. */
+  /** Fewest moves in an unassisted clear (null if only ever cleared with the assist). */
   bestMoves: number | null;
   /** Cleared, but only ever with the assist. Shown as a mark in level select. */
   assistedOnly: boolean;
@@ -17,25 +18,21 @@ export interface Settings {
 }
 
 export interface SaveData {
-  version: 1;
+  version: 2;
   levels: Record<string, LevelRecord>;
   settings: Settings;
 }
 
 export function emptySave(): SaveData {
-  return { version: 1, levels: {}, settings: { colorblind: false, devUnlock: false } };
+  return { version: 2, levels: {}, settings: { colorblind: false, devUnlock: false } };
 }
 
 /** Records a win. Never lowers earlier results. */
-export function recordWin(save: SaveData, levelId: string, movesUsed: number, stars: 0 | 1 | 2 | 3, assisted: boolean): SaveData {
+export function recordWin(save: SaveData, levelId: string, movesUsed: number, assisted: boolean): SaveData {
   const prev = save.levels[levelId];
   const rec: LevelRecord = assisted
-    ? prev ?? { stars: 0, bestMoves: null, assistedOnly: true }
-    : {
-        stars: Math.max(prev?.stars ?? 0, stars) as LevelRecord['stars'],
-        bestMoves: prev?.bestMoves == null ? movesUsed : Math.min(prev.bestMoves, movesUsed),
-        assistedOnly: false,
-      };
+    ? prev ?? { bestMoves: null, assistedOnly: true }
+    : { bestMoves: prev?.bestMoves == null ? movesUsed : Math.min(prev.bestMoves, movesUsed), assistedOnly: false };
   return { ...save, levels: { ...save.levels, [levelId]: rec } };
 }
 
@@ -50,22 +47,38 @@ export function isUnlocked(save: SaveData, order: readonly string[], levelId: st
   return k === 0 || (k > 0 && isCleared(save, order[k - 1]));
 }
 
-/** Checks and normalizes a save loaded from storage or an imported file. Throws if unusable. */
-export function parseSave(raw: unknown): SaveData {
+/**
+ * Version 1 saves were keyed on positional labels ("4-3") and stored stars.
+ * Maps each record through `labelToId`; records with no matching level are dropped.
+ */
+export function migrateSave(v1: { levels: Record<string, LevelRecord>; settings: Settings }, labelToId: ReadonlyMap<string, string>): SaveData {
+  const save = emptySave();
+  for (const [label, rec] of Object.entries(v1.levels)) {
+    const id = labelToId.get(label);
+    if (id) save.levels[id] = { bestMoves: rec.bestMoves, assistedOnly: rec.assistedOnly };
+  }
+  save.settings = { ...v1.settings };
+  return save;
+}
+
+/**
+ * Checks and normalizes a save loaded from storage or an imported file. Throws if unusable.
+ * Version 1 saves are migrated through `labelToId` (see migrateSave).
+ */
+export function parseSave(raw: unknown, labelToId: ReadonlyMap<string, string>): SaveData {
   if (typeof raw !== 'object' || raw === null) throw new Error('not a better dots save file');
   const o = raw as Record<string, unknown>;
-  if (o.version !== 1) throw new Error(`unsupported save version ${JSON.stringify(o.version)}`);
+  if (o.version !== 1 && o.version !== 2) throw new Error(`unsupported save version ${JSON.stringify(o.version)}`);
   if (typeof o.levels !== 'object' || o.levels === null) throw new Error('save has no levels');
-  const save = emptySave();
+  const levels: Record<string, LevelRecord> = {};
   for (const [id, v] of Object.entries(o.levels as Record<string, unknown>)) {
     const r = v as Record<string, unknown>;
-    const stars = r?.stars;
-    if (stars !== 0 && stars !== 1 && stars !== 2 && stars !== 3) throw new Error(`level ${id}: bad stars`);
-    const best = r.bestMoves;
+    if (o.version === 1 && ![0, 1, 2, 3].includes(r?.stars as number)) throw new Error(`level ${id}: bad stars`);
+    const best = r?.bestMoves;
     if (best !== null && !(typeof best === 'number' && Number.isInteger(best) && best > 0)) throw new Error(`level ${id}: bad bestMoves`);
-    save.levels[id] = { stars, bestMoves: best, assistedOnly: r.assistedOnly === true };
+    levels[id] = { bestMoves: best, assistedOnly: r.assistedOnly === true };
   }
   const s = (o.settings ?? {}) as Record<string, unknown>;
-  save.settings = { colorblind: s.colorblind === true, devUnlock: s.devUnlock === true };
-  return save;
+  const settings = { colorblind: s.colorblind === true, devUnlock: s.devUnlock === true };
+  return o.version === 1 ? migrateSave({ levels, settings }, labelToId) : { version: 2, levels, settings };
 }

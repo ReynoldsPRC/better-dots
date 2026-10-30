@@ -3,10 +3,16 @@ import { emptySave, parseSave, type SaveData } from '../progress';
 
 const KEY = 'better-dots-save';
 
-export function loadSave(): SaveData {
+/** `labelToId` maps level labels ("4-3") to stable ids, for migrating version 1 saves. */
+export function loadSave(labelToId: ReadonlyMap<string, string>): SaveData {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return parseSave(JSON.parse(raw));
+    if (raw) {
+      const data = JSON.parse(raw);
+      const save = parseSave(data, labelToId);
+      if (data.version !== save.version) storeSave(save);
+      return save;
+    }
     // Settings saved by the first prototype.
     const old = JSON.parse(localStorage.getItem('better-dots-settings') ?? '{}');
     const save = emptySave();
@@ -35,7 +41,7 @@ export function exportSave(save: SaveData): void {
 }
 
 /** Asks for a save file. Resolves with the parsed save, or null if cancelled. Rejects if the file is bad. */
-export function pickSaveFile(): Promise<SaveData | null> {
+export function pickSaveFile(labelToId: ReadonlyMap<string, string>): Promise<SaveData | null> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -44,7 +50,7 @@ export function pickSaveFile(): Promise<SaveData | null> {
       const file = input.files?.[0];
       if (!file) return resolve(null);
       try {
-        resolve(parseSave(JSON.parse(await file.text())));
+        resolve(parseSave(JSON.parse(await file.text()), labelToId));
       } catch (err) {
         reject(err);
       }

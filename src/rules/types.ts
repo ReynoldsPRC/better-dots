@@ -96,8 +96,10 @@ export type Status = 'playing' | 'won' | 'lost';
 
 /** A level as the rules see it. Level JSON files are parsed into this. */
 export interface LevelDef {
-  /** "world-level", e.g. "1-3". Comes from the file's place in the levels folder. */
+  /** Stable id from the level file ("id"). Saves are keyed on it, so it survives renumbering. */
   id: string;
+  /** Positional name, e.g. "1-3" or "c4-2". Comes from the file's place in the levels folder; shown to the player. */
+  label: string;
   name?: string;
   seed: number;
   moves: number;

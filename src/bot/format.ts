@@ -10,14 +10,14 @@ export interface BotNote {
   p10: number;
 }
 
-export type LevelFile = Omit<LevelDef, 'id'> & { bot?: BotNote };
+export type LevelFile = Omit<LevelDef, 'label'> & { bot?: BotNote };
 
-/** The level as it should appear in a file: no id (that comes from the file's position). */
+/** The level as it should appear in a file: no label (that comes from the file's position). */
 export function toLevelFile(level: LevelDef, bot?: BotNote): LevelFile {
-  const { id: _id, ...rest } = level;
+  const { label: _label, ...rest } = level;
   const out: Record<string, unknown> = {};
   // Fixed key order keeps diffs small.
-  for (const k of ['name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'ice', 'water', 'slime', 'fire', 'goals', 'stars'] as const) {
+  for (const k of ['id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'ice', 'water', 'slime', 'fire', 'goals', 'stars'] as const) {
     if (rest[k] !== undefined) out[k] = rest[k];
   }
   for (const [k, v] of Object.entries(rest)) if (!(k in out) && v !== undefined) out[k] = v;

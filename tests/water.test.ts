@@ -67,7 +67,7 @@ describe('water', () => {
   });
 
   it('level files: water grids and flood goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
     expect(parseLevel({ ...base, water: ['x.', '..'], goals: [{ type: 'flood' }] }, 'x').water).toEqual(['x.', '..']);
     expect(() => parseLevel({ ...base, goals: [{ type: 'flood' }] }, 'x')).toThrow(/needs some starting/);
     expect(() => parseLevel({ ...base, water: ['w.', '..'], goals: [{ type: 'flood' }] }, 'x')).toThrow(/"w"/);

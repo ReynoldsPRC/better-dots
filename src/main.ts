@@ -9,7 +9,9 @@ import { exportSave, loadSave, pickSaveFile, storeSave } from './ui/storage';
 
 const $ = (id: string) => document.getElementById(id)!;
 
-let save: SaveData = loadSave();
+/** Level labels ("4-3", "c4-2") to stable ids, for migrating old saves keyed on labels. */
+const labelToId = new Map([...catalog.order, ...candidates.order].map((l) => [l.label, l.id]));
+let save: SaveData = loadSave(labelToId);
 /** Developer switch from the URL: ?dev or ?dev=1 unlocks every level. */
 const devFromUrl = /[?&]dev(=1|=true)?(&|$)/.test(location.search);
 const devUnlock = () => devFromUrl || save.settings.devUnlock;
@@ -42,12 +44,12 @@ function showSelect(): void {
 
 function startLevel(id: string): void {
   const level = catalog.byId.get(id) ?? (devUnlock() ? candidates.byId.get(id) : undefined);
-  if (!level || !(level.id.startsWith('c') || isUnlocked(save, order, id, devUnlock()))) return;
+  if (!level || !(candidates.byId.has(id) || isUnlocked(save, order, id, devUnlock()))) return;
   hideCard();
   current = level;
   $('select').hidden = true;
   $('play').hidden = false;
-  $('level-label').textContent = level.name ? `${level.id} · ${level.name}` : level.id;
+  $('level-label').textContent = level.name ? `${level.label} · ${level.name}` : level.label;
   // Same opening board every time; refills differ per attempt.
   play.start(createGame(level, { playSeed: (Math.random() * 2 ** 32) >>> 0 }));
 }
@@ -64,7 +66,7 @@ function onEnd(state: GameState): void {
   if (!level) return;
   if (state.status === 'won') {
     const stars = starsFor(level, state.movesUsed, state.assisted);
-    persist(recordWin(save, level.id, state.movesUsed, stars, state.assisted));
+    persist(recordWin(save, level.id, state.movesUsed, state.assisted));
     const next = nextLevelId(level.id);
     showCard('Cleared!', [
       state.assisted
@@ -103,7 +105,7 @@ function colorblindToggle(): HTMLElement {
 
 function openPlayMenu(): void {
   const level = current!;
-  showCard(level.id, [colorblindToggle()], [
+  showCard(level.label, [colorblindToggle()], [
     { label: 'Retry level', onClick: () => startLevel(level.id) },
     { label: 'Levels', onClick: showSelect },
     { label: 'Close', primary: true, onClick: hideCard },
@@ -121,7 +123,7 @@ function openSettings(): void {
     {
       label: 'Import save',
       onClick: () => {
-        pickSaveFile().then(
+        pickSaveFile(labelToId).then(
           (loaded) => {
             if (!loaded) return;
             if (confirm('Replace your current progress with this save?')) persist(loaded);

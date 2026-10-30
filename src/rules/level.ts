@@ -5,13 +5,21 @@ import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type PlacedPiece, t
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLORS;
 
-/** Validates a level file's contents. Throws with a readable message on any problem. */
-export function parseLevel(raw: unknown, id: string): LevelDef {
+/** A level file's stable id: lowercase letters and digits. */
+export const LEVEL_ID = /^[a-z0-9]{6,12}$/;
+
+/**
+ * Validates a level file's contents. Throws with a readable message on any problem.
+ * `label` is the level's positional name ("1-3"), used in messages and shown to the player.
+ */
+export function parseLevel(raw: unknown, label: string): LevelDef {
   const fail = (msg: string): never => {
-    throw new Error(`level ${id}: ${msg}`);
+    throw new Error(`level ${label}: ${msg}`);
   };
   if (typeof raw !== 'object' || raw === null) fail('not an object');
   const o = raw as Record<string, unknown>;
+
+  if (typeof o.id !== 'string' || !LEVEL_ID.test(o.id)) fail('"id" must be 6-12 lowercase letters or digits (run: npm run levels -- ids)');
 
   if (!isInt(o.seed)) fail('"seed" must be an integer');
   if (!isInt(o.moves) || (o.moves as number) < 1) fail('"moves" must be a positive integer');
@@ -172,7 +180,8 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
   }
 
   return {
-    id,
+    id: o.id as string,
+    label,
     name: typeof o.name === 'string' ? o.name : undefined,
     seed: o.seed as number,
     moves: o.moves as number,

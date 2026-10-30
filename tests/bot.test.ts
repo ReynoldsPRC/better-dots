@@ -6,7 +6,7 @@ import { candidates, catalog } from '../src/levels';
 import { createGame, isLoopClosed, isValidPath, parseLevel, type LevelDef } from '../src/rules';
 
 const easy: LevelDef = {
-  id: 'easy', seed: 3, moves: 30, colors: [0, 1, 2], layout: Array(6).fill('......'),
+  id: 'easy', label: 'easy', seed: 3, moves: 30, colors: [0, 1, 2], layout: Array(6).fill('......'),
   goals: [{ type: 'collect', color: 0, count: 10 }],
 };
 
@@ -19,7 +19,7 @@ describe('bot', () => {
   });
 
   it('finds lines on shaped and walled boards', () => {
-    const level = catalog.byId.get('3-6')!;
+    const level = catalog.order.find((l) => l.label === '3-6')!;
     const s = createGame(level);
     for (const m of candidateMoves(s)) expect(isValidPath(s, m)).toBe(true);
   });
@@ -100,11 +100,11 @@ describe('level files', () => {
   it('format round-trips through the parser', () => {
     for (const level of [...catalog.order, ...candidates.order]) {
       const text = formatLevelJson(toLevelFile(level));
-      expect(parseLevel(JSON.parse(text), level.id)).toEqual(level);
+      expect(parseLevel(JSON.parse(text), level.label)).toEqual(level);
     }
   });
 
   it('every shipped level has bot-set stars', () => {
-    for (const level of catalog.order) expect(level.stars, level.id).toBeDefined();
+    for (const level of catalog.order) expect(level.stars, level.label).toBeDefined();
   });
 });

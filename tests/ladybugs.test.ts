@@ -81,7 +81,7 @@ describe('ladybugs', () => {
   });
 
   it('level files: ladybugs and ladybug goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
     expect(parseLevel({ ...base, pieces: [bug(0, 0, 1, 2)], goals: [{ type: 'ladybugs', count: 1 }] }, 'x').pieces).toEqual([bug(0, 0, 1, 2)]);
     expect(() => parseLevel({ ...base, pieces: [bug(0, 0, 1, 5)], goals: [{ type: 'ladybugs', count: 1 }] }, 'x')).toThrow(/spots/);
     expect(() => parseLevel({ ...base, pieces: [bug(0, 0, 1)], goals: [{ type: 'ladybugs', count: 2 }] }, 'x')).toThrow(/only has 1/);

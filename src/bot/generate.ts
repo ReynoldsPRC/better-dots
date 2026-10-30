@@ -230,6 +230,8 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
       goals.unshift({ type: 'anchors', count: p.anchors.start + anchorDrops });
     }
     return parseLevel({
+      // The levels script swaps in a fresh random id when it writes the file.
+      id: 'candidate',
       ...(name ? { name } : {}),
       seed: rng.int(1_000_000),
       moves,

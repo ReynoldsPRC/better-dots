@@ -67,7 +67,7 @@ describe('fire', () => {
   });
 
   it('level files: fire grids and fire goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
     expect(parseLevel({ ...base, fire: ['x.', '..'], goals: [{ type: 'fire' }] }, 'x').fire).toEqual(['x.', '..']);
     expect(() => parseLevel({ ...base, goals: [{ type: 'fire' }] }, 'x')).toThrow(/needs some starting/);
     expect(() => parseLevel({ ...base, layout: ['0.', '..'], fire: ['x.', '..'], goals: [{ type: 'fire' }] }, 'x')).toThrow(/holds no dot/);

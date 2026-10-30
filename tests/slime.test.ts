@@ -49,7 +49,7 @@ describe('slime', () => {
   });
 
   it('level files: slime grids and slime goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
     expect(parseLevel({ ...base, slime: ['x.', '..'], goals: [{ type: 'slime' }] }, 'x').slime).toEqual(['x.', '..']);
     expect(() => parseLevel({ ...base, goals: [{ type: 'slime' }] }, 'x')).toThrow(/needs some starting/);
   });

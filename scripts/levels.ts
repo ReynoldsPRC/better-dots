@@ -1,11 +1,13 @@
 // Level tools. Run with: npm run levels -- <command>
-//   list                          bot stats for every level
+//   list                          ids and bot stats for every level
+//   ids                           give every level file (shipped or candidate) without an "id" a new one
 //   score [world ...] [--runs N]  re-run the bot; set moves, stars, and bot notes in each file
 //   generate <world> <count>      make candidates into levels/candidates/world-N/
 //                                 [--seed S] [--ramp a,b] (a..b within the preset's easy 0 to hard 1)
 //   keep <world> <n ...>          move candidates n... to the end of world N
 //   drop <world> <n ...>          remove levels n... from world N (renumbers the rest)
 //   reject <world> <n ...>        delete candidates n... (renumbers the rest)
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { analyzeLevel, tuneFromStats } from '../src/bot/bot';
@@ -28,8 +30,32 @@ function worlds(): number[] {
   return readdirSync(ROOT).map((d) => d.match(/^world-(\d+)$/)).filter(Boolean).map((m) => Number(m![1])).sort((a, b) => a - b);
 }
 
-function read(dir: string, f: string, id: string) {
-  return parseLevel(JSON.parse(readFileSync(join(dir, f), 'utf8')), id);
+function read(dir: string, f: string, label: string) {
+  return parseLevel(JSON.parse(readFileSync(join(dir, f), 'utf8')), label);
+}
+
+/** Every level file, shipped and candidate, with its directory. */
+function allFiles(): { dir: string; f: string }[] {
+  const dirs = worlds().flatMap((w) => [worldDir(w), candDir(w)]);
+  return dirs.flatMap((dir) => levelFiles(dir).map((f) => ({ dir, f })));
+}
+
+/** A new random level id (8 base36 chars) not used by any level file. */
+const usedIds = new Set<string>();
+function mintId(): string {
+  if (usedIds.size === 0) {
+    for (const { dir, f } of allFiles()) {
+      const id = JSON.parse(readFileSync(join(dir, f), 'utf8')).id;
+      if (typeof id === 'string') usedIds.add(id);
+    }
+  }
+  for (;;) {
+    const id = [...randomBytes(8)].map((b) => (b % 36).toString(36)).join('');
+    if (!usedIds.has(id)) {
+      usedIds.add(id);
+      return id;
+    }
+  }
 }
 
 /** Renames NN.json files so they run 01, 02, ... with no gaps. */
@@ -63,8 +89,18 @@ switch (cmd) {
       for (const f of levelFiles(worldDir(w))) {
         const raw = JSON.parse(readFileSync(join(worldDir(w), f), 'utf8'));
         const b = raw.bot ?? {};
-        console.log(`${w}-${f.slice(0, 2)}  moves ${String(raw.moves).padStart(2)}  stars ${raw.stars ? `${raw.stars.two}/${raw.stars.three}` : '-'}  bot win ${b.winRate ?? '-'} median ${b.median ?? '-'}  ${raw.name ?? ''}`);
+        console.log(`${w}-${f.slice(0, 2)}  ${raw.id ?? '(no id)'}  moves ${String(raw.moves).padStart(2)}  stars ${raw.stars ? `${raw.stars.two}/${raw.stars.three}` : '-'}  bot win ${b.winRate ?? '-'} median ${b.median ?? '-'}  ${raw.name ?? ''}`);
       }
+    }
+    break;
+  }
+  case 'ids': {
+    for (const { dir, f } of allFiles()) {
+      const raw = JSON.parse(readFileSync(join(dir, f), 'utf8'));
+      if (raw.id !== undefined) continue;
+      const out = { id: mintId(), ...raw };
+      writeFileSync(join(dir, f), formatLevelJson(out));
+      console.log(`${join(dir, f).slice(ROOT.length + 1)}: id ${out.id}`);
     }
     break;
   }
@@ -75,12 +111,12 @@ switch (cmd) {
         const stats = analyzeLevel(level, runs, level.seed);
         const t = tuneFromStats(stats);
         if (!t) {
-          console.log(`${level.id}: bot finished only ${Math.round(stats.finishRate * 100)}% of runs; left unchanged. Consider dropping it.`);
+          console.log(`${level.label}: bot finished only ${Math.round(stats.finishRate * 100)}% of runs; left unchanged. Consider dropping it.`);
           continue;
         }
         const next = { ...level, moves: t.moves, stars: t.stars };
         writeFileSync(join(worldDir(w), f), formatLevelJson(toLevelFile(next, botNote(stats, t.moves))));
-        console.log(`${level.id}: moves ${level.moves} -> ${t.moves}, stars 2@${t.stars.two} 3@${t.stars.three}, bot median ${stats.median}`);
+        console.log(`${level.label}: moves ${level.moves} -> ${t.moves}, stars 2@${t.stars.two} 3@${t.stars.three}, bot median ${stats.median}`);
       }
     }
     break;
@@ -100,7 +136,7 @@ switch (cmd) {
       }
       k++;
       n++;
-      writeFileSync(join(candDir(w), `${pad(n)}.json`), formatLevelJson(toLevelFile(c.level, c.bot)));
+      writeFileSync(join(candDir(w), `${pad(n)}.json`), formatLevelJson(toLevelFile({ ...c.level, id: mintId() }, c.bot)));
       tries = 0;
       console.log(`candidate c${w}-${n}: moves ${c.level.moves}, bot win ${c.bot.winRate}, median ${c.bot.median}`);
     }
@@ -114,7 +150,7 @@ switch (cmd) {
       const src = join(candDir(w), `${pad(k)}.json`);
       if (!existsSync(src)) throw new Error(`no candidate ${src}`);
       renameSync(src, join(worldDir(w), `${pad(++n)}.json`));
-      console.log(`candidate c${w}-${k} is now level ${w}-${n}`);
+      console.log(`candidate c${w}-${k} is now level ${w}-${n} (id unchanged)`);
     }
     renumber(candDir(w));
     break;
@@ -133,5 +169,5 @@ switch (cmd) {
     break;
   }
   default:
-    console.log('commands: list | score [world ...] | generate <world> <count> | keep <world> <n ...> | drop <world> <n ...> | reject <world> <n ...>');
+    console.log('commands: list | ids | score [world ...] | generate <world> <count> | keep <world> <n ...> | drop <world> <n ...> | reject <world> <n ...>');
 }

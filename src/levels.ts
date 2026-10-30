@@ -12,12 +12,13 @@ export interface Catalog {
   worlds: World[];
   /** Every level in play order. */
   order: LevelDef[];
+  /** Keyed on the stable id from the level file. */
   byId: Map<string, LevelDef>;
 }
 
 /**
  * Builds the catalog from { path: parsed JSON }. Paths look like ".../world-2/03.json".
- * `prefix` marks a separate set (candidates get "c", so ids look like "c2-3").
+ * `prefix` marks a separate set (candidates get "c", so labels look like "c2-3").
  */
 export function buildCatalog(files: Record<string, unknown>, prefix = ''): Catalog {
   const worlds = new Map<number, { name: string; files: [number, unknown][] }>();
@@ -42,7 +43,13 @@ export function buildCatalog(files: Record<string, unknown>, prefix = ''): Catal
     }))
     .filter((w) => w.levels.length > 0);
   const order = list.flatMap((w) => w.levels);
-  return { worlds: list, order, byId: new Map(order.map((l) => [l.id, l])) };
+  const byId = new Map<string, LevelDef>();
+  for (const l of order) {
+    const dup = byId.get(l.id);
+    if (dup) throw new Error(`levels ${dup.label} and ${l.label} share the id ${l.id}`);
+    byId.set(l.id, l);
+  }
+  return { worlds: list, order, byId };
 }
 
 export const catalog: Catalog = buildCatalog(

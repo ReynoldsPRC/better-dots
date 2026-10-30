@@ -9,7 +9,7 @@ const ids = (s: GameState) => s.cells.map((p) => p?.id ?? null);
 
 describe('createGame', () => {
   it('places fixed colors and fills "." from the level seed', () => {
-    const level: LevelDef = { id: 't', seed: 9, moves: 10, colors: [1, 2], goals: [], layout: ['0..', '...'] };
+    const level: LevelDef = { id: 't', label: 't', seed: 9, moves: 10, colors: [1, 2], goals: [], layout: ['0..', '...'] };
     const a = createGame(level);
     const b = createGame(level);
     expect(colors(a)).toEqual(colors(b));
@@ -123,7 +123,7 @@ describe('loops and bombs', () => {
   });
 
   it('a bomb clears the cells around it', () => {
-    const level: LevelDef = { id: 't', seed: 1, moves: 5, colors: [0, 1, 2, 3], goals: [], layout: RING };
+    const level: LevelDef = { id: 't', label: 't', seed: 1, moves: 5, colors: [0, 1, 2, 3], goals: [], layout: RING };
     const s = createGame(level, { bombRadius: 2 });
     const { result } = applyMove(s, ring(s));
     expect(result.steps[1].cells).toHaveLength(16 - 8);
@@ -131,7 +131,7 @@ describe('loops and bombs', () => {
 
   it('every kind of clear counts toward goals', () => {
     const level: LevelDef = {
-      id: 't', seed: 1, moves: 5, colors: [0, 1, 2, 3], layout: RING,
+      id: 't', label: 't', seed: 1, moves: 5, colors: [0, 1, 2, 3], layout: RING,
       goals: [{ type: 'collect', color: 0, count: 8 }, { type: 'collect', color: 2, count: 2 }],
     };
     const s = createGame(level, { bombRadius: 2 });
@@ -179,7 +179,7 @@ describe('goals, winning, and running out of moves', () => {
 
 describe('determinism and invariants', () => {
   const level: LevelDef = {
-    id: 'fuzz', seed: 77, moves: 1000, colors: [0, 1, 2, 3, 4], goals: [], layout: Array(7).fill('......'),
+    id: 'fuzz', label: 'fuzz', seed: 77, moves: 1000, colors: [0, 1, 2, 3, 4], goals: [], layout: Array(7).fill('......'),
   };
 
   function playRandom(seed: number, moves: number) {
@@ -219,7 +219,7 @@ describe('determinism and invariants', () => {
 
   it('a stuck board is reshuffled for free', () => {
     // Two colors on a 1x3 strip get stuck often; play until it happens.
-    const strip: LevelDef = { id: 'strip', seed: 3, moves: 1000, colors: [0, 1], goals: [], layout: ['...'] };
+    const strip: LevelDef = { id: 'strip', label: 'strip', seed: 3, moves: 1000, colors: [0, 1], goals: [], layout: ['...'] };
     let s = createGame(strip, { playSeed: 4 });
     let seen = false;
     for (let k = 0; k < 200 && !seen; k++) {

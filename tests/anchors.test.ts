@@ -7,7 +7,7 @@ const countAnchors = (s: GameState) => s.cells.filter((p) => p?.kind === 'anchor
 
 describe('anchors', () => {
   const level = (extra: Partial<LevelDef> = {}): LevelDef => ({
-    id: 't', seed: 1, moves: 20, colors: [0, 1, 2, 3], layout: ['.1', '00', '00', '23'],
+    id: 't', label: 't', seed: 1, moves: 20, colors: [0, 1, 2, 3], layout: ['.1', '00', '00', '23'],
     pieces: [{ r: 0, c: 0, type: 'anchor' }], goals: [{ type: 'anchors', count: 1 }], ...extra,
   });
 
@@ -66,7 +66,7 @@ describe('anchors', () => {
 
   it('stay put when a stuck board is reshuffled', () => {
     const s = createGame({
-      id: 't', seed: 1, moves: 9, colors: [0, 1], goals: [], layout: ['01.', '10.', '01.'],
+      id: 't', label: 't', seed: 1, moves: 9, colors: [0, 1], goals: [], layout: ['01.', '10.', '01.'],
       pieces: [{ r: 0, c: 2, type: 'anchor' }, { r: 1, c: 2, type: 'anchor' }, { r: 2, c: 2, type: 'anchor' }],
     });
     expect(hasMove(s)).toBe(true);
@@ -74,7 +74,7 @@ describe('anchors', () => {
   });
 
   it('level files: pieces and anchor goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'], goals: [{ type: 'anchors', count: 2 }] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'], goals: [{ type: 'anchors', count: 2 }] };
     expect(() => parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }] }, 'x')).toThrow(/only has 1/);
     expect(parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }], anchorDrops: 1 }, 'x').anchorDrops).toBe(1);
     expect(() => parseLevel({ ...base, pieces: [{ r: 5, c: 0, type: 'anchor' }] }, 'x')).toThrow(/cell of the layout/);

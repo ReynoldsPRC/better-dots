@@ -45,7 +45,7 @@ describe('walls', () => {
   it('pairs split by walls are not moves, so the board is reshuffled', () => {
     // Only same-color neighbors are (0,0)-(0,1), and a wall separates them.
     const level: LevelDef = {
-      id: 't', seed: 1, moves: 5, colors: [0, 1], goals: [],
+      id: 't', label: 't', seed: 1, moves: 5, colors: [0, 1], goals: [],
       layout: ['00', '1-'], walls: [{ r: 0, c: 0, side: 'right' }],
     };
     const s = createGame(level);
@@ -60,7 +60,7 @@ describe('walls', () => {
   });
 
   it('rejects walls that are not between two cells', () => {
-    const base = { seed: 1, moves: 5, colors: [0], layout: ['..'], goals: [{ type: 'collect', color: 0, count: 1 }] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0], layout: ['..'], goals: [{ type: 'collect', color: 0, count: 1 }] };
     expect(() => parseLevel({ ...base, walls: [{ r: 0, c: 1, side: 'right' }] }, 'x')).toThrow(/between two cells/);
     expect(() => parseLevel({ ...base, walls: [{ r: 0, c: 0, side: 'diagonal' }] }, 'x')).toThrow(/side/);
     expect(parseLevel({ ...base, walls: [{ r: 0, c: 0, side: 'right' }] }, 'x').walls).toHaveLength(1);
@@ -106,7 +106,7 @@ describe('shaped boards', () => {
   });
 
   it('parses "-" in level files and rejects an all-empty layout', () => {
-    const base = { seed: 1, moves: 5, colors: [0], goals: [{ type: 'collect', color: 0, count: 1 }] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0], goals: [{ type: 'collect', color: 0, count: 1 }] };
     expect(parseLevel({ ...base, layout: ['.-.', '...'] }, 'x').layout).toEqual(['.-.', '...']);
     expect(() => parseLevel({ ...base, layout: ['--'] }, 'x')).toThrow(/no cells/);
   });
@@ -114,7 +114,7 @@ describe('shaped boards', () => {
 
 describe('random play on a shaped, walled board', () => {
   const level: LevelDef = {
-    id: 'shape', seed: 5, moves: 1000, colors: [0, 1, 2, 3], goals: [],
+    id: 'shape', label: 'shape', seed: 5, moves: 1000, colors: [0, 1, 2, 3], goals: [],
     layout: ['-....-', '......', '..--..', '......', '-....-'],
     walls: [{ r: 1, c: 2, side: 'right' }, { r: 3, c: 1, side: 'down' }, { r: 0, c: 3, side: 'down' }],
   };

@@ -4,6 +4,7 @@ import { createGame, type ColorId, type GameState, type Goal, type LevelDef, typ
 export function game(layout: string[], extra: Partial<LevelDef> = {}, playSeed = 1): GameState {
   const level: LevelDef = {
     id: 'test',
+    label: 'test',
     seed: 1,
     moves: 20,
     colors: [0, 1, 2, 3] as ColorId[],

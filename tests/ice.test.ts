@@ -73,7 +73,7 @@ describe('ice', () => {
   });
 
   it('level files: ice grids and ice goals are checked', () => {
-    const base = { seed: 1, moves: 5, colors: [0, 1], layout: ['..', '.-'] };
+    const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '.-'] };
     const goal = (count: number) => [{ type: 'ice', count }];
     expect(parseLevel({ ...base, ice: ['12', '..'], goals: goal(2) }, 'x').ice).toEqual(['12', '..']);
     expect(() => parseLevel({ ...base, ice: ['12', '..'], goals: goal(3) }, 'x')).toThrow(/only has 2/);
