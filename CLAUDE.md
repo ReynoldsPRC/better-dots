@@ -39,9 +39,9 @@ Non-negotiable. Don't add any of these, even as an option:
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
 - `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` (clear stages, settled board, spawned ids) that the render layer animates.
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
-- `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). Level ids are `N-NN` from that position. `src/levels.ts` bundles them at build time; `tests/level.test.ts` checks every shipped file. Level file fields: `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
+- `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). Level ids are `N-NN` from that position. `src/levels.ts` bundles them at build time; `tests/level.test.ts` checks every shipped file. Level file fields: `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot, `-` no cell), `walls` (optional list of `{ "r", "c", "side": "up" | "down" | "left" | "right" }`, each between two cells), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
 - `src/progress.ts`: save format and unlock/star bookkeeping (pure). `src/ui/storage.ts`: localStorage key `better-dots-save`, export/import as a JSON file from Settings. Developer switch: Settings toggle, or `?dev` in the URL.
-- World 1's move limits were hand-set and sanity-checked with a throwaway greedy player; expect the step 5 bot to retune them.
+- Worlds 1-3 (core, shaped boards, walls) were hand-made; move limits and goal counts were sanity-checked with a throwaway greedy player. Expect the step 5 bot to retune them.
 - A board with no goals never counts as won (sandbox). Retrying a level keeps its starting layout (from the level seed) but uses a new play seed for refills.
 - Dev builds expose the play screen as `window.__play` for console poking.
 - `public/sw.js`: service worker (network-first for the page, cache-first for hashed assets; bump `VERSION` to evict old caches). `public/manifest.webmanifest`. Icons come from `npm run icons`.
@@ -123,7 +123,7 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 
 ## Levels and progression
 
-- Levels are grouped into worlds. Each world introduces exactly one new mechanic, in build order. World 1 is core rules only.
+- Levels are grouped into worlds. Each world introduces exactly one new mechanic, in build order. World 1 is core rules only, World 2 shaped boards, World 3 walls; the step 6 mechanics start at World 4.
 - Levels unlock one at a time, in order. The developer switch unlocks everything.
 - Goal types: collect N dots of a color; sink N anchors; break N ice; flood the board; extinguish fire; clean slime; trigger N gems; clear N ladybugs. Levels can combine goals.
 - **Out of moves:** offer "5 more moves" (the assist) or an instant retry. No penalty either way.

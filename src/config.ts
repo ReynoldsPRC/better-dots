@@ -20,6 +20,18 @@ export const config = {
     maxCell: 72,
   },
 
+  terrain: {
+    /** On shaped boards, a faint tile behind each cell so the shape reads. Alpha of the ink color. */
+    tileAlpha: 0.06,
+    /** Tile size and corner radius as fractions of cell size. */
+    tileScale: 0.92,
+    tileRadius: 0.22,
+    /** Walls: thickness as a fraction of cell size, alpha of the ink color, end inset as a fraction of cell. */
+    wallThickness: 0.07,
+    wallAlpha: 0.6,
+    wallInset: 0.1,
+  },
+
   input: {
     /** How close (fraction of cell size) the finger must be to a dot's center to pick it. */
     hitRadius: 0.46,

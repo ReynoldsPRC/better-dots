@@ -15,6 +15,13 @@ export interface Dot {
 
 export type Piece = Dot;
 
+/** A wall on one side of cell (r, c). */
+export interface Wall {
+  r: number;
+  c: number;
+  side: 'up' | 'down' | 'left' | 'right';
+}
+
 export type Goal = { type: 'collect'; color: ColorId; count: number };
 
 export interface GoalState {
@@ -32,8 +39,10 @@ export interface LevelDef {
   seed: number;
   moves: number;
   colors: ColorId[];
-  /** One string per row: '.' random dot, '0'-'4' a dot of that color. */
+  /** One string per row: '.' random dot, '0'-'4' a dot of that color, '-' no cell. */
   layout: string[];
+  /** Barriers on cell edges. Lines can't cross them; falling dots can. */
+  walls?: Wall[];
   goals: Goal[];
   /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
   stars?: { two: number; three: number };
@@ -44,6 +53,9 @@ export interface GameState {
   cols: number;
   /** false = no cell here. */
   playable: boolean[];
+  /** Wall on the right / bottom edge of each cell. */
+  wallRight: boolean[];
+  wallDown: boolean[];
   cells: (Piece | null)[];
   /** Colors that can appear on this board. */
   colors: ColorId[];

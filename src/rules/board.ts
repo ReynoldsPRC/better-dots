@@ -4,6 +4,10 @@ export interface Grid {
   rows: number;
   cols: number;
   playable: boolean[];
+  /** Wall on the right edge of each cell (between c and c+1). */
+  wallRight: boolean[];
+  /** Wall on the bottom edge of each cell (between r and r+1). */
+  wallDown: boolean[];
 }
 
 export function toIndex(g: Grid, r: number, c: number): number {
@@ -24,6 +28,18 @@ export function areAdjacent(g: Grid, a: number, b: number): boolean {
   const [ra, ca] = toRC(g, a);
   const [rb, cb] = toRC(g, b);
   return Math.abs(ra - rb) + Math.abs(ca - cb) === 1;
+}
+
+/** True if a wall sits on the edge between two orthogonally adjacent cells. */
+export function wallBetween(g: Grid, a: number, b: number): boolean {
+  const lo = Math.min(a, b);
+  const sameRow = Math.floor(a / g.cols) === Math.floor(b / g.cols);
+  return sameRow ? g.wallRight[lo] : g.wallDown[lo];
+}
+
+/** Adjacent with no wall in between: a line can cross from a to b. */
+export function canCross(g: Grid, a: number, b: number): boolean {
+  return areAdjacent(g, a, b) && !wallBetween(g, a, b);
 }
 
 /** Playable cells within Chebyshev distance `radius`, excluding `i` itself. */

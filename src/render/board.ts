@@ -43,6 +43,8 @@ export function drawScene(
   ctx.fillStyle = config.background[theme];
   ctx.fillRect(0, 0, width, height);
 
+  drawTerrain(ctx, layout, state, theme);
+
   const dragColor = drag && drag.path.length > 0 ? state.cells[drag.path[0]]?.color ?? null : null;
 
   // Board-wide tints: the loop pulse after a move, a faint wash while a loop is held.
@@ -108,6 +110,45 @@ export function drawScene(
     ctx.arc(x, y, radius + cell * (config.bomb.radius + 0.2) * b.progress, 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+/** Cell tiles (shaped boards only) and walls. */
+function drawTerrain(ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, theme: Theme) {
+  const { cell, x0, y0 } = layout;
+  const t = config.terrain;
+  if (s.playable.some((p) => !p)) {
+    ctx.fillStyle = withAlpha(config.ink[theme], t.tileAlpha);
+    const size = cell * t.tileScale;
+    const pad = (cell - size) / 2;
+    for (let i = 0; i < s.playable.length; i++) {
+      if (!s.playable[i]) continue;
+      const r = Math.floor(i / s.cols);
+      const c = i % s.cols;
+      ctx.beginPath();
+      ctx.roundRect(x0 + c * cell + pad, y0 + r * cell + pad, size, size, cell * t.tileRadius);
+      ctx.fill();
+    }
+  }
+  ctx.strokeStyle = withAlpha(config.ink[theme], t.wallAlpha);
+  ctx.lineWidth = cell * t.wallThickness;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  const inset = cell * t.wallInset;
+  for (let i = 0; i < s.playable.length; i++) {
+    const r = Math.floor(i / s.cols);
+    const c = i % s.cols;
+    if (s.wallRight[i]) {
+      const x = x0 + (c + 1) * cell;
+      ctx.moveTo(x, y0 + r * cell + inset);
+      ctx.lineTo(x, y0 + (r + 1) * cell - inset);
+    }
+    if (s.wallDown[i]) {
+      const y = y0 + (r + 1) * cell;
+      ctx.moveTo(x0 + c * cell + inset, y);
+      ctx.lineTo(x0 + (c + 1) * cell - inset, y);
+    }
+  }
+  ctx.stroke();
 }
 
 function drawDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, opts: DrawOptions) {

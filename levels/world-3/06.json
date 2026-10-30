@@ -1,0 +1,34 @@
+{
+  "name": "Rooms",
+  "seed": 3006,
+  "moves": 30,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    ".......",
+    "......."
+  ],
+  "walls": [
+    { "r": 0, "c": 3, "side": "right" },
+    { "r": 1, "c": 3, "side": "right" },
+    { "r": 2, "c": 3, "side": "right" },
+    { "r": 4, "c": 3, "side": "right" },
+    { "r": 5, "c": 3, "side": "right" },
+    { "r": 6, "c": 3, "side": "right" },
+    { "r": 3, "c": 0, "side": "down" },
+    { "r": 3, "c": 1, "side": "down" },
+    { "r": 3, "c": 2, "side": "down" },
+    { "r": 3, "c": 4, "side": "down" },
+    { "r": 3, "c": 5, "side": "down" },
+    { "r": 3, "c": 6, "side": "down" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 15 },
+    { "type": "collect", "color": 3, "count": 15 },
+    { "type": "collect", "color": 4, "count": 15 }
+  ]
+}

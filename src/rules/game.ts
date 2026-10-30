@@ -1,7 +1,7 @@
 // Game state transitions: setup, moves, gravity, refill, reshuffle, goals.
 // Every function here is pure: it returns new state and never mutates input.
 import { config } from '../config';
-import { areAdjacent, cellsAround, toIndex } from './board';
+import { canCross, cellsAround, toIndex } from './board';
 import { enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
 import type { ClearStep, ColorId, GameState, GoalState, LevelDef, MoveResult, Piece } from './types';
@@ -25,7 +25,10 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const ch = level.layout[r][c] ?? '';
-      if (ch === '.') {
+      if (ch === '-') {
+        playable.push(false);
+        cells.push(null);
+      } else if (ch === '.') {
         playable.push(true);
         cells.push(null);
       } else if (/^[0-4]$/.test(ch)) {
@@ -37,6 +40,8 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     }
   }
 
+  const { wallRight, wallDown } = placeWalls(level, rows, cols);
+
   const boardRng = new Rng(seedRng(level.seed));
   for (let i = 0; i < cells.length; i++) {
     if (playable[i] && cells[i] === null) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
@@ -46,6 +51,8 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     rows,
     cols,
     playable,
+    wallRight,
+    wallDown,
     cells,
     colors: level.colors.slice(),
     rng: 0,
@@ -61,6 +68,23 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   state.cells = reshuffleUntilPlayable(state, state.cells, boardRng);
   state.rng = opts.playSeed === undefined ? boardRng.state : seedRng(opts.playSeed);
   return state;
+}
+
+/** Converts level walls (any side of a cell) to right/down edge flags. */
+function placeWalls(level: LevelDef, rows: number, cols: number) {
+  const wallRight: boolean[] = new Array(rows * cols).fill(false);
+  const wallDown: boolean[] = new Array(rows * cols).fill(false);
+  for (const w of level.walls ?? []) {
+    const [r, c, flags] =
+      w.side === 'right' ? [w.r, w.c, wallRight] :
+      w.side === 'left' ? [w.r, w.c - 1, wallRight] :
+      w.side === 'down' ? [w.r, w.c, wallDown] :
+      [w.r - 1, w.c, wallDown];
+    const inside = r >= 0 && c >= 0 && r < rows && c < cols && (flags === wallRight ? c + 1 < cols : r + 1 < rows);
+    if (!inside) throw new Error(`level ${level.id}: wall ${JSON.stringify(w)} is not between two cells`);
+    flags[r * cols + c] = true;
+  }
+  return { wallRight, wallDown };
 }
 
 export function movesLeft(s: GameState): number {
@@ -79,7 +103,7 @@ export function hasMove(s: GameState, cells: readonly (Piece | null)[] = s.cells
       const a = cells[i];
       if (!a || a.kind !== 'dot') continue;
       for (const j of [c + 1 < s.cols ? i + 1 : -1, r + 1 < s.rows ? i + s.cols : -1]) {
-        if (j < 0 || !areAdjacent(s, i, j)) continue;
+        if (j < 0 || !canCross(s, i, j)) continue;
         const b = cells[j];
         if (b && b.kind === 'dot' && b.color === a.color) return true;
       }
@@ -103,7 +127,7 @@ function reshuffleUntilPlayable(s: GameState, cells: (Piece | null)[], rng: Rng)
     if (hasMove(s, out)) return out;
   }
   for (const a of spots) {
-    const b = spots.find((j) => areAdjacent(s, a, j));
+    const b = spots.find((j) => canCross(s, a, j));
     if (b !== undefined) {
       out[b] = { ...(out[b] as Piece), color: (out[a] as Piece).color };
       return out;

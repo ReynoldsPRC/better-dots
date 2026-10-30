@@ -1,7 +1,7 @@
 // Building and checking a connection: the line the player drags.
 // A path is a list of cell indices. A closed loop ends on a cell that already
 // appears earlier in the path.
-import { areAdjacent, isCell, toRC } from './board';
+import { canCross, isCell, toRC } from './board';
 import type { ColorId, GameState } from './types';
 
 export function connectableColor(s: GameState, i: number): ColorId | null {
@@ -10,10 +10,10 @@ export function connectableColor(s: GameState, i: number): ColorId | null {
   return p && p.kind === 'dot' ? p.color : null;
 }
 
-/** Can the line step from a to b? Same color, orthogonally adjacent. */
+/** Can the line step from a to b? Same color, orthogonally adjacent, no wall between. */
 export function canLink(s: GameState, a: number, b: number): boolean {
   const ca = connectableColor(s, a);
-  return ca !== null && ca === connectableColor(s, b) && areAdjacent(s, a, b);
+  return ca !== null && ca === connectableColor(s, b) && canCross(s, a, b);
 }
 
 export function isLoopClosed(path: readonly number[]): boolean {

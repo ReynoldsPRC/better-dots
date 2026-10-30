@@ -1,0 +1,23 @@
+{
+  "name": "Fence",
+  "seed": 3001,
+  "moves": 16,
+  "colors": [0, 1, 2],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "walls": [
+    { "r": 2, "c": 1, "side": "down" },
+    { "r": 2, "c": 2, "side": "down" },
+    { "r": 2, "c": 3, "side": "down" },
+    { "r": 2, "c": 4, "side": "down" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 18 }
+  ]
+}

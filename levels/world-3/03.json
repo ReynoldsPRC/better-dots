@@ -1,0 +1,28 @@
+{
+  "name": "The box",
+  "seed": 3003,
+  "moves": 20,
+  "colors": [0, 1, 2, 3],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "walls": [
+    { "r": 2, "c": 2, "side": "up" },
+    { "r": 2, "c": 3, "side": "up" },
+    { "r": 3, "c": 2, "side": "down" },
+    { "r": 3, "c": 3, "side": "down" },
+    { "r": 2, "c": 2, "side": "left" },
+    { "r": 3, "c": 2, "side": "left" },
+    { "r": 2, "c": 3, "side": "right" },
+    { "r": 3, "c": 3, "side": "right" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 18 },
+    { "type": "collect", "color": 3, "count": 18 }
+  ]
+}

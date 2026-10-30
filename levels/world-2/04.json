@@ -1,0 +1,20 @@
+{
+  "name": "Pillars",
+  "seed": 2004,
+  "moves": 22,
+  "colors": [0, 1, 2, 3],
+  "layout": [
+    "......",
+    ".-..-.",
+    ".-..-.",
+    "......",
+    ".-..-.",
+    ".-..-.",
+    "......"
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 13 },
+    { "type": "collect", "color": 1, "count": 13 },
+    { "type": "collect", "color": 2, "count": 13 }
+  ]
+}

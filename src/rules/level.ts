@@ -1,6 +1,6 @@
 // Level data: checks a parsed level file and scores a finished attempt.
 import { config } from '../config';
-import { MAX_COLORS, type ColorId, type Goal, type LevelDef } from './types';
+import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type Wall } from './types';
 
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLORS;
@@ -29,9 +29,27 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
   const rows = layout as string[];
   if (rows.some((r) => r.length !== rows[0].length)) fail('"layout" rows must all be the same length');
   rows.forEach((row, r) => {
-    const bad = row.search(/[^.0-4]/);
+    const bad = row.search(/[^.0-4-]/);
     if (bad >= 0) fail(`"layout" has ${JSON.stringify(row[bad])} at row ${r}, col ${bad}`);
   });
+  if (!rows.some((r) => /[^-]/.test(r))) fail('"layout" has no cells');
+
+  let walls: Wall[] | undefined;
+  if (o.walls !== undefined) {
+    if (!Array.isArray(o.walls)) fail('"walls" must be a list');
+    walls = (o.walls as unknown[]).map((w, k): Wall => {
+      const wo = w as Record<string, unknown>;
+      const sides = ['up', 'down', 'left', 'right'];
+      if (!isInt(wo?.r) || !isInt(wo.c) || !sides.includes(wo.side as string)) {
+        fail(`wall ${k}: must be { "r": row, "c": col, "side": "up" | "down" | "left" | "right" }`);
+      }
+      const r = wo.r as number, c = wo.c as number, side = wo.side as Wall['side'];
+      const [r2, c2] = side === 'up' ? [r - 1, c] : side === 'down' ? [r + 1, c] : side === 'left' ? [r, c - 1] : [r, c + 1];
+      const inGrid = (rr: number, cc: number) => rr >= 0 && rr < rows.length && cc >= 0 && cc < rows[0].length;
+      if (!inGrid(r, c) || !inGrid(r2, c2)) fail(`wall ${k}: must sit between two cells of the layout`);
+      return { r, c, side };
+    });
+  }
 
   if (!Array.isArray(o.goals) || o.goals.length === 0) fail('"goals" must be a non-empty list');
   const goals = (o.goals as unknown[]).map((g, k): Goal => {
@@ -58,6 +76,7 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     moves: o.moves as number,
     colors: (colors as ColorId[]).slice(),
     layout: rows.slice(),
+    walls,
     goals,
     stars,
   };

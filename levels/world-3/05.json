@@ -1,0 +1,27 @@
+{
+  "name": "Stairs",
+  "seed": 3005,
+  "moves": 25,
+  "colors": [0, 1, 2, 3, 4],
+  "layout": [
+    "---....",
+    "--.....",
+    "-......",
+    ".......",
+    "......-",
+    ".....--",
+    "....---"
+  ],
+  "walls": [
+    { "r": 1, "c": 3, "side": "down" },
+    { "r": 2, "c": 2, "side": "down" },
+    { "r": 3, "c": 1, "side": "down" },
+    { "r": 3, "c": 4, "side": "down" },
+    { "r": 4, "c": 3, "side": "down" },
+    { "r": 5, "c": 2, "side": "down" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 0, "count": 15 },
+    { "type": "collect", "color": 4, "count": 15 }
+  ]
+}

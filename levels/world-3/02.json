@@ -1,0 +1,26 @@
+{
+  "name": "Halves",
+  "seed": 3002,
+  "moves": 20,
+  "colors": [0, 1, 2, 3],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "walls": [
+    { "r": 0, "c": 2, "side": "right" },
+    { "r": 1, "c": 2, "side": "right" },
+    { "r": 2, "c": 2, "side": "right" },
+    { "r": 3, "c": 2, "side": "right" },
+    { "r": 4, "c": 2, "side": "right" },
+    { "r": 5, "c": 2, "side": "right" }
+  ],
+  "goals": [
+    { "type": "collect", "color": 1, "count": 20 },
+    { "type": "collect", "color": 2, "count": 20 }
+  ]
+}
