@@ -1,7 +1,7 @@
 {
   "id": "4owwgw0u",
   "seed": 122501,
-  "moves": 16,
+  "moves": 13,
   "colors": [1, 2, 4],
   "layout": [
     "......",
@@ -18,6 +18,6 @@
   "goals": [
     { "type": "anchors", "count": 4 }
   ],
-  "stars": { "two": 13, "three": 12 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 14, "p10": 12 }
+  "stars": { "two": 11, "three": 10 },
+  "bot": { "runs": 100, "winRate": 0.8, "median": 12, "p10": 10 }
 }

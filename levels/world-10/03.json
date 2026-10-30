@@ -1,7 +1,7 @@
 {
   "id": "bdjavrea",
   "seed": 88949,
-  "moves": 7,
+  "moves": 6,
   "colors": [0, 2, 3, 4],
   "layout": [
     ".-..-.",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "fire" }
   ],
-  "stars": { "two": 3, "three": 3 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 4, "p10": 4 }
+  "stars": { "two": 3, "three": 2 },
+  "bot": { "runs": 100, "winRate": 0.82, "median": 4, "p10": 3 }
 }

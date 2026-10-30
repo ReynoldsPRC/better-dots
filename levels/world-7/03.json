@@ -1,7 +1,7 @@
 {
   "id": "xa985vb9",
   "seed": 893129,
-  "moves": 19,
+  "moves": 10,
   "colors": [0, 1, 2, 3],
   "layout": [
     "...-...",
@@ -22,6 +22,6 @@
     { "type": "gems", "count": 4 },
     { "type": "collect", "color": 3, "count": 12 }
   ],
-  "stars": { "two": 10, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 11, "p10": 6 }
+  "stars": { "two": 6, "three": 3 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 7, "p10": 3 }
 }

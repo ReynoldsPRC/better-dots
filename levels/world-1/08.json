@@ -2,7 +2,7 @@
   "id": "ocg7591a",
   "name": "Spread thin",
   "seed": 1008,
-  "moves": 33,
+  "moves": 29,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     "......",
@@ -17,6 +17,6 @@
     { "type": "collect", "color": 2, "count": 16 },
     { "type": "collect", "color": 3, "count": 16 }
   ],
-  "stars": { "two": 28, "three": 23 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 29, "p10": 23 }
+  "stars": { "two": 26, "three": 20 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 27, "p10": 20 }
 }

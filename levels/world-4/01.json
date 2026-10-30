@@ -2,7 +2,7 @@
   "id": "1rtc2pj9",
   "name": "Drop the anchor",
   "seed": 4001,
-  "moves": 9,
+  "moves": 7,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -19,6 +19,6 @@
   "goals": [
     { "type": "anchors", "count": 2 }
   ],
-  "stars": { "two": 6, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.81, "median": 7, "p10": 6 }
+  "stars": { "two": 4, "three": 3 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 5, "p10": 4 }
 }

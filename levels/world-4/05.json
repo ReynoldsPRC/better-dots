@@ -1,7 +1,7 @@
 {
   "id": "fvmeeqjp",
   "seed": 248490,
-  "moves": 28,
+  "moves": 11,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "anchors", "count": 3 }
   ],
-  "stars": { "two": 12, "three": 7 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 13, "p10": 7 }
+  "stars": { "two": 7, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 8, "p10": 5 }
 }

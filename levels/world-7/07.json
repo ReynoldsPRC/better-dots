@@ -1,7 +1,7 @@
 {
   "id": "3zdbr4s6",
   "seed": 439633,
-  "moves": 41,
+  "moves": 27,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -24,6 +24,6 @@
     { "type": "gems", "count": 6 },
     { "type": "collect", "color": 0, "count": 8 }
   ],
-  "stars": { "two": 23, "three": 7 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 24, "p10": 7 }
+  "stars": { "two": 18, "three": 7 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 19, "p10": 7 }
 }

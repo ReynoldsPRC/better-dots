@@ -1,7 +1,7 @@
 {
   "id": "1scbplg9",
   "seed": 162070,
-  "moves": 19,
+  "moves": 16,
   "colors": [0, 1, 3, 4],
   "layout": [
     ".......",
@@ -25,6 +25,6 @@
     { "type": "anchors", "count": 4 },
     { "type": "collect", "color": 0, "count": 12 }
   ],
-  "stars": { "two": 13, "three": 11 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 14, "p10": 11 }
+  "stars": { "two": 12, "three": 10 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 13, "p10": 10 }
 }

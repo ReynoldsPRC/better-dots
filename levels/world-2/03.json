@@ -2,7 +2,7 @@
   "id": "42lm34ki",
   "name": "Diamond",
   "seed": 2003,
-  "moves": 21,
+  "moves": 18,
   "colors": [0, 1, 2, 3],
   "layout": [
     "---.---",
@@ -17,6 +17,6 @@
     { "type": "collect", "color": 1, "count": 16 },
     { "type": "collect", "color": 3, "count": 16 }
   ],
-  "stars": { "two": 18, "three": 14 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 19, "p10": 14 }
+  "stars": { "two": 15, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 16, "p10": 11 }
 }

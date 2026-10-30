@@ -1,7 +1,7 @@
 {
   "id": "w0hl512v",
   "seed": 54571,
-  "moves": 30,
+  "moves": 20,
   "colors": [0, 2, 3, 4],
   "layout": [
     ".......",
@@ -33,6 +33,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 22, "three": 13 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 23, "p10": 13 }
+  "stars": { "two": 16, "three": 12 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 17, "p10": 12 }
 }

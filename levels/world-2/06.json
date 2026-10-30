@@ -2,7 +2,7 @@
   "id": "iplc2xmy",
   "name": "Islands",
   "seed": 2006,
-  "moves": 28,
+  "moves": 25,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -18,6 +18,6 @@
     { "type": "collect", "color": 2, "count": 15 },
     { "type": "collect", "color": 4, "count": 15 }
   ],
-  "stars": { "two": 23, "three": 20 },
-  "bot": { "runs": 100, "winRate": 0.78, "median": 24, "p10": 20 }
+  "stars": { "two": 22, "three": 17 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 23, "p10": 17 }
 }

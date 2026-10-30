@@ -1,7 +1,7 @@
 {
   "id": "13cdg8r2",
   "seed": 300634,
-  "moves": 23,
+  "moves": 13,
   "colors": [1, 2, 3, 4],
   "layout": [
     "......",
@@ -19,6 +19,6 @@
   "goals": [
     { "type": "gems", "count": 3 }
   ],
-  "stars": { "two": 13, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.78, "median": 14, "p10": 6 }
+  "stars": { "two": 10, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 11, "p10": 6 }
 }

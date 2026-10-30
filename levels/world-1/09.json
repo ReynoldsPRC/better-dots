@@ -2,7 +2,7 @@
   "id": "p6f8iej8",
   "name": "Big board",
   "seed": 1009,
-  "moves": 39,
+  "moves": 32,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -17,6 +17,6 @@
     { "type": "collect", "color": 0, "count": 26 },
     { "type": "collect", "color": 3, "count": 26 }
   ],
-  "stars": { "two": 33, "three": 28 },
-  "bot": { "runs": 100, "winRate": 0.78, "median": 34, "p10": 28 }
+  "stars": { "two": 27, "three": 21 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 28, "p10": 21 }
 }

@@ -2,7 +2,7 @@
   "id": "dwlp5l88",
   "name": "Put it out",
   "seed": 10001,
-  "moves": 11,
+  "moves": 8,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     "......",
@@ -23,6 +23,6 @@
   "goals": [
     { "type": "fire" }
   ],
-  "stars": { "two": 6, "three": 5 },
-  "bot": { "runs": 100, "winRate": 0.78, "median": 7, "p10": 5 }
+  "stars": { "two": 5, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 6, "p10": 4 }
 }

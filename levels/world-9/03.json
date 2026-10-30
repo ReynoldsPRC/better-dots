@@ -1,7 +1,7 @@
 {
   "id": "dgfxn5xw",
   "seed": 198596,
-  "moves": 12,
+  "moves": 9,
   "colors": [0, 1, 2, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 8, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 9, "p10": 6 }
+  "stars": { "two": 6, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.8, "median": 7, "p10": 5 }
 }

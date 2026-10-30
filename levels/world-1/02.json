@@ -2,7 +2,7 @@
   "id": "9fzx1si2",
   "name": "Two at once",
   "seed": 1002,
-  "moves": 15,
+  "moves": 10,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -16,6 +16,6 @@
     { "type": "collect", "color": 0, "count": 20 },
     { "type": "collect", "color": 2, "count": 20 }
   ],
-  "stars": { "two": 12, "three": 10 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 13, "p10": 10 }
+  "stars": { "two": 7, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.82, "median": 8, "p10": 6 }
 }

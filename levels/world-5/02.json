@@ -1,7 +1,7 @@
 {
   "id": "bvyunqj3",
   "seed": 67489,
-  "moves": 11,
+  "moves": 8,
   "colors": [0, 2, 3],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "ice", "count": 16 }
   ],
-  "stars": { "two": 8, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.82, "median": 9, "p10": 6 }
+  "stars": { "two": 5, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 6, "p10": 4 }
 }

@@ -2,7 +2,7 @@
   "id": "5rgfncn8",
   "name": "First dots",
   "seed": 1001,
-  "moves": 8,
+  "moves": 7,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -15,6 +15,6 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 15 }
   ],
-  "stars": { "two": 7, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.8, "median": 8, "p10": 6 }
+  "stars": { "two": 5, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.8, "median": 6, "p10": 4 }
 }

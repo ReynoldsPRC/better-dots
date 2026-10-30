@@ -2,7 +2,7 @@
   "id": "t6fodk7j",
   "name": "Fence",
   "seed": 3001,
-  "moves": 8,
+  "moves": 7,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -21,6 +21,6 @@
   "goals": [
     { "type": "collect", "color": 0, "count": 18 }
   ],
-  "stars": { "two": 6, "three": 4 },
-  "bot": { "runs": 100, "winRate": 0.87, "median": 7, "p10": 4 }
+  "stars": { "two": 5, "three": 3 },
+  "bot": { "runs": 100, "winRate": 0.85, "median": 6, "p10": 3 }
 }

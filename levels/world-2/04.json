@@ -2,7 +2,7 @@
   "id": "tqhl6xlx",
   "name": "Pillars",
   "seed": 2004,
-  "moves": 21,
+  "moves": 19,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -18,6 +18,6 @@
     { "type": "collect", "color": 1, "count": 13 },
     { "type": "collect", "color": 2, "count": 13 }
   ],
-  "stars": { "two": 18, "three": 17 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 19, "p10": 17 }
+  "stars": { "two": 17, "three": 15 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 18, "p10": 15 }
 }

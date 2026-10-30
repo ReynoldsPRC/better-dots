@@ -1,7 +1,7 @@
 {
   "id": "g6pomkhd",
   "seed": 744083,
-  "moves": 19,
+  "moves": 14,
   "colors": [0, 2, 3, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 14, "three": 10 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 15, "p10": 10 }
+  "stars": { "two": 12, "three": 9 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 13, "p10": 9 }
 }

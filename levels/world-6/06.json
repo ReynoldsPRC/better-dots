@@ -1,7 +1,7 @@
 {
   "id": "xmwushez",
   "seed": 789261,
-  "moves": 27,
+  "moves": 18,
   "colors": [0, 1, 2, 4],
   "layout": [
     ".......",
@@ -33,6 +33,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 20, "three": 13 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 21, "p10": 13 }
+  "stars": { "two": 14, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 15, "p10": 11 }
 }

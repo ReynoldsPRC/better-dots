@@ -1,7 +1,7 @@
 {
   "id": "sa66l9xn",
   "seed": 624897,
-  "moves": 21,
+  "moves": 14,
   "colors": [0, 1, 3, 4],
   "layout": [
     ".......",
@@ -27,6 +27,6 @@
     { "type": "anchors", "count": 3 },
     { "type": "collect", "color": 0, "count": 8 }
   ],
-  "stars": { "two": 13, "three": 9 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 14, "p10": 9 }
+  "stars": { "two": 10, "three": 8 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 11, "p10": 8 }
 }

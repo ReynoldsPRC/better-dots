@@ -2,7 +2,7 @@
   "id": "9mnbeu1e",
   "name": "Rooms",
   "seed": 3006,
-  "moves": 32,
+  "moves": 28,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -32,6 +32,6 @@
     { "type": "collect", "color": 3, "count": 15 },
     { "type": "collect", "color": 4, "count": 15 }
   ],
-  "stars": { "two": 26, "three": 21 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 27, "p10": 21 }
+  "stars": { "two": 23, "three": 18 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 24, "p10": 18 }
 }

@@ -1,7 +1,7 @@
 {
   "id": "mqvatevl",
   "seed": 79916,
-  "moves": 9,
+  "moves": 8,
   "colors": [0, 2, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 7, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.87, "median": 8, "p10": 6 }
+  "stars": { "two": 6, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.82, "median": 7, "p10": 6 }
 }

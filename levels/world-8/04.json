@@ -1,7 +1,7 @@
 {
   "id": "m5tuklrk",
   "seed": 930204,
-  "moves": 17,
+  "moves": 13,
   "colors": [1, 2, 3, 4],
   "layout": [
     "......",
@@ -23,5 +23,5 @@
     { "type": "ladybugs", "count": 2 }
   ],
   "stars": { "two": 8, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 9, "p10": 6 }
+  "bot": { "runs": 100, "winRate": 0.78, "median": 9, "p10": 6 }
 }

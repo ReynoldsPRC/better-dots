@@ -1,7 +1,7 @@
 {
   "id": "s27gky70",
   "seed": 413246,
-  "moves": 24,
+  "moves": 14,
   "colors": [0, 2, 3, 4],
   "layout": [
     ".......",
@@ -23,6 +23,6 @@
     { "type": "gems", "count": 5 },
     { "type": "collect", "color": 3, "count": 12 }
   ],
-  "stars": { "two": 13, "three": 7 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 14, "p10": 7 }
+  "stars": { "two": 9, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 10, "p10": 6 }
 }

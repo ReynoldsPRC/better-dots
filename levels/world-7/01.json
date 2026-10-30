@@ -19,6 +19,6 @@
   "goals": [
     { "type": "gems", "count": 2 }
   ],
-  "stars": { "two": 3, "three": 3 },
-  "bot": { "runs": 100, "winRate": 0.84, "median": 4, "p10": 3 }
+  "stars": { "two": 3, "three": 2 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 4, "p10": 3 }
 }

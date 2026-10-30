@@ -2,7 +2,7 @@
   "id": "fnnrocey",
   "name": "Courtyard",
   "seed": 2002,
-  "moves": 23,
+  "moves": 19,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -16,6 +16,6 @@
     { "type": "collect", "color": 0, "count": 15 },
     { "type": "collect", "color": 2, "count": 15 }
   ],
-  "stars": { "two": 19, "three": 16 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 20, "p10": 16 }
+  "stars": { "two": 16, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 17, "p10": 11 }
 }

@@ -2,7 +2,7 @@
   "id": "6a0j8ib6",
   "name": "The box",
   "seed": 3003,
-  "moves": 21,
+  "moves": 18,
   "colors": [0, 1, 2, 3],
   "layout": [
     "......",
@@ -26,6 +26,6 @@
     { "type": "collect", "color": 0, "count": 18 },
     { "type": "collect", "color": 3, "count": 18 }
   ],
-  "stars": { "two": 17, "three": 13 },
-  "bot": { "runs": 100, "winRate": 0.78, "median": 18, "p10": 13 }
+  "stars": { "two": 14, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.81, "median": 15, "p10": 11 }
 }

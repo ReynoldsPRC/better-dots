@@ -1,7 +1,7 @@
 {
   "id": "jakz78f2",
   "seed": 592328,
-  "moves": 15,
+  "moves": 11,
   "colors": [0, 2, 3, 4],
   "layout": [
     "......",
@@ -23,6 +23,6 @@
   "goals": [
     { "type": "anchors", "count": 4 }
   ],
-  "stars": { "two": 11, "three": 8 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 12, "p10": 8 }
+  "stars": { "two": 8, "three": 7 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 9, "p10": 7 }
 }

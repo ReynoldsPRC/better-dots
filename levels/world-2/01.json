@@ -2,7 +2,7 @@
   "id": "r8brsktz",
   "name": "Hourglass",
   "seed": 2001,
-  "moves": 10,
+  "moves": 9,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -16,6 +16,6 @@
     { "type": "collect", "color": 0, "count": 16 },
     { "type": "collect", "color": 1, "count": 16 }
   ],
-  "stars": { "two": 8, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 9, "p10": 6 }
+  "stars": { "two": 6, "three": 5 },
+  "bot": { "runs": 100, "winRate": 0.87, "median": 7, "p10": 5 }
 }

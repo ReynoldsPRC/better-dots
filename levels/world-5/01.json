@@ -2,7 +2,7 @@
   "id": "uj5e3iz9",
   "name": "Thin ice",
   "seed": 5001,
-  "moves": 9,
+  "moves": 8,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -23,6 +23,6 @@
   "goals": [
     { "type": "ice", "count": 8 }
   ],
-  "stars": { "two": 7, "three": 5 },
-  "bot": { "runs": 100, "winRate": 0.84, "median": 8, "p10": 5 }
+  "stars": { "two": 5, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.87, "median": 6, "p10": 5 }
 }

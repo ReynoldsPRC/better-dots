@@ -1,7 +1,7 @@
 {
   "id": "d961l435",
   "seed": 842574,
-  "moves": 25,
+  "moves": 21,
   "colors": [0, 1, 2, 3],
   "layout": [
     ".......",
@@ -33,6 +33,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 15, "three": 9 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 16, "p10": 9 }
+  "stars": { "two": 12, "three": 8 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 13, "p10": 8 }
 }

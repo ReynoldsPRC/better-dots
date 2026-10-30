@@ -1,7 +1,7 @@
 {
   "id": "wypproo1",
   "seed": 753639,
-  "moves": 20,
+  "moves": 15,
   "colors": [0, 1, 3, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 14, "three": 9 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 15, "p10": 9 }
+  "stars": { "two": 11, "three": 8 },
+  "bot": { "runs": 100, "winRate": 0.82, "median": 12, "p10": 8 }
 }

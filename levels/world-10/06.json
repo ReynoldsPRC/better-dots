@@ -1,7 +1,7 @@
 {
   "id": "5a6fdnil",
   "seed": 104084,
-  "moves": 25,
+  "moves": 15,
   "colors": [0, 1, 3, 4],
   "layout": [
     ".......",
@@ -34,6 +34,6 @@
     { "type": "fire" },
     { "type": "collect", "color": 4, "count": 12 }
   ],
-  "stars": { "two": 15, "three": 8 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 16, "p10": 8 }
+  "stars": { "two": 10, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 11, "p10": 6 }
 }

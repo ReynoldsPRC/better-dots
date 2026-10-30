@@ -2,7 +2,7 @@
   "id": "b8t12ftr",
   "name": "Stairs",
   "seed": 3005,
-  "moves": 27,
+  "moves": 20,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     "---....",
@@ -25,6 +25,6 @@
     { "type": "collect", "color": 0, "count": 15 },
     { "type": "collect", "color": 4, "count": 15 }
   ],
-  "stars": { "two": 22, "three": 17 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 23, "p10": 17 }
+  "stars": { "two": 16, "three": 11 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 17, "p10": 11 }
 }

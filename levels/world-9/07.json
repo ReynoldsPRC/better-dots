@@ -1,7 +1,7 @@
 {
   "id": "9gvggqrf",
   "seed": 896432,
-  "moves": 31,
+  "moves": 17,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".......",
@@ -33,6 +33,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 20, "three": 10 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 21, "p10": 10 }
+  "stars": { "two": 12, "three": 8 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 13, "p10": 8 }
 }

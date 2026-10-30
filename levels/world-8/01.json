@@ -2,7 +2,7 @@
   "id": "598p6j9t",
   "name": "Catch it",
   "seed": 8001,
-  "moves": 7,
+  "moves": 6,
   "colors": [1, 2, 4],
   "layout": [
     "......",
@@ -19,6 +19,6 @@
   "goals": [
     { "type": "ladybugs", "count": 2 }
   ],
-  "stars": { "two": 5, "three": 5 },
-  "bot": { "runs": 100, "winRate": 0.83, "median": 6, "p10": 5 }
+  "stars": { "two": 5, "three": 4 },
+  "bot": { "runs": 100, "winRate": 0.81, "median": 6, "p10": 4 }
 }

@@ -2,7 +2,7 @@
   "id": "8w9aui4o",
   "name": "Spring",
   "seed": 6001,
-  "moves": 11,
+  "moves": 9,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -21,6 +21,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 8, "three": 7 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 9, "p10": 7 }
+  "stars": { "two": 7, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.81, "median": 8, "p10": 6 }
 }

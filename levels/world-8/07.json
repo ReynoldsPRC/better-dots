@@ -1,7 +1,7 @@
 {
   "id": "36h1cppq",
   "seed": 364773,
-  "moves": 19,
+  "moves": 16,
   "colors": [0, 1, 2, 4],
   "layout": [
     ".......",
@@ -25,6 +25,6 @@
     { "type": "ladybugs", "count": 3 },
     { "type": "collect", "color": 0, "count": 12 }
   ],
-  "stars": { "two": 13, "three": 9 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 14, "p10": 9 }
+  "stars": { "two": 10, "three": 7 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 11, "p10": 7 }
 }

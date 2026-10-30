@@ -17,6 +17,6 @@
   "goals": [
     { "type": "ladybugs", "count": 1 }
   ],
-  "stars": { "two": 6, "three": 6 },
+  "stars": { "two": 6, "three": 5 },
   "bot": { "runs": 100, "winRate": 0.81, "median": 7, "p10": 6 }
 }
