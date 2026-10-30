@@ -87,9 +87,10 @@ export class MoveAnimation {
             const toRow = Math.floor(i / this.cols);
             const fromRow = from.get(p.id)?.[0] ?? event.spawnFrom[p.id] ?? toRow;
             const d = toRow - fromRow;
-            const ms = d <= 0 ? 0 : Math.max(minMs, (1000 * d) / speed);
+            const appears = !from.has(p.id) && d === 0;
+            const ms = appears ? config.fall.appearMs : d <= 0 ? 0 : Math.max(minMs, (1000 * d) / speed);
             seg.fallMs!.set(p.id, ms);
-            longest = Math.max(longest, ms);
+            longest = Math.max(longest, appears ? ms - settleMs : ms);
           });
           seg.dur = longest > 0 ? longest + settleMs : 0;
           break;
@@ -162,7 +163,8 @@ export class MoveAnimation {
     const { event, before } = seg;
     const cols = this.cols;
     switch (event.kind) {
-      case 'clear': {
+      case 'clear':
+      case 'layers': {
         // Pieces gone after this stage pop; the rest stay put (and show their new state).
         const after = positions(event.board, cols);
         const p = Math.min(1, lt / config.clear.popMs);
@@ -184,6 +186,10 @@ export class MoveAnimation {
           const c = i % cols;
           const fromR = from.get(piece.id)?.[0] ?? event.spawnFrom[piece.id] ?? toR;
           const ms = seg.fallMs!.get(piece.id) ?? 0;
+          if (!from.has(piece.id) && fromR === toR) {
+            // Appearing in place (under ice or fire): grow in.
+            return [{ id: piece.id, piece, r: toR, c, scale: ease('easeOutCubic', lt / ms), alpha: 1 }];
+          }
           let r = toR;
           if (ms > 0 && lt < ms) r = fromR + (toR - fromR) * ease(easing, lt / ms);
           else if (ms > 0 && lt - ms < settleMs) r = toR - settleBounce * Math.sin(Math.PI * ((lt - ms) / settleMs));
@@ -199,8 +205,6 @@ export class MoveAnimation {
         }
         return out;
       }
-      case 'layers':
-        return this.still(event.board);
       case 'fly': {
         // Each ladybug arcs to its new cell; the dot it lands on slides over to where the ladybug was.
         const p = ease('easeInOutQuad', lt / config.ladybug.flyMs);

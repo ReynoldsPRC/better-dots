@@ -64,6 +64,8 @@ export const config = {
     settleMs: 120,
     /** Shortest fall, so one-cell drops are still visible. */
     minMs: 90,
+    /** New dots under ice or fire can't fall in, so they grow in place over this long. */
+    appearMs: 240,
   },
 
   anchor: {
@@ -119,6 +121,17 @@ export const config = {
     /** Blob size as a fraction of cell size; how much its edge wobbles. */
     scale: 0.9,
     wobble: 0.05,
+  },
+
+  fire: {
+    /** Burning-cell tile and flame colors. Charcoal and amber, so a flame never reads as a dot. */
+    tile: { light: '#3B3532', dark: '#2A2523' },
+    outer: { light: '#E8913F', dark: '#E8913F' },
+    inner: { light: '#F6D27A', dark: '#F6D27A' },
+    /** Tile size and corner radius as fractions of cell size; flame height as a fraction of cell. */
+    scale: 0.9,
+    radius: 0.22,
+    flame: 0.62,
   },
 
   shuffle: {

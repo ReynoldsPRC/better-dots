@@ -70,7 +70,9 @@ export type Goal =
   | { type: 'gems'; count: number }
   | { type: 'ladybugs'; count: number }
   /** Clean every slimed cell. */
-  | { type: 'slime' };
+  | { type: 'slime' }
+  /** Put out every fire. */
+  | { type: 'fire' };
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
@@ -80,6 +82,8 @@ export interface Layers {
   water: boolean[];
   /** Slimed cells. Slime under ice is dormant until the ice breaks. */
   slime: boolean[];
+  /** Burning cells: they hold no piece and gravity stops at them. Fire under ice is dormant. */
+  fire: boolean[];
 }
 
 export interface GoalState {
@@ -112,6 +116,8 @@ export interface LevelDef {
   water?: string[];
   /** Slimed cells at the start: one string per row, '.' clean or 'x' slimed. */
   slime?: string[];
+  /** Burning cells at the start: one string per row, '.' or 'x' burning. */
+  fire?: string[];
   goals: Goal[];
   /** Most moves used that still earns 2 or 3 stars. Set from bot results. */
   stars?: { two: number; three: number };

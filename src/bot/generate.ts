@@ -26,6 +26,8 @@ export interface GenParams {
   gems?: { count: number; crossShare: number };
   /** Slime goal: this many slimed cells to start (mirrored), `underIce` of them frozen over. */
   slime?: { cells: number; underIce?: number };
+  /** Fire goal: this many burning cells to start (mirrored), `underIce` of them frozen over. */
+  fire?: { cells: number; underIce?: number };
   /** Ladybug goal: this many three-spot ladybugs; clear them all. */
   ladybugs?: number;
   /** Flood goal: this many watered cells to start (mirrored), `underIce` of them frozen over. */
@@ -208,6 +210,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const iceSeed = rng.int(1_000_000);
   const { cells: water, ice: waterIce } = placeLayer(p.water && { count: p.water.sources, underIce: p.water.underIce }, p, layout, rng);
   const { cells: slime, ice: slimeIce } = placeLayer(p.slime && { count: p.slime.cells, underIce: p.slime.underIce }, p, layout, rng);
+  const { cells: fire, ice: fireIce } = placeLayer(p.fire && { count: p.fire.cells, underIce: p.fire.underIce }, p, layout, rng);
 
   const build = (count: number, moves: number): LevelDef => {
     const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
@@ -218,8 +221,9 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
     if (p.ladybugs) goals.unshift({ type: 'ladybugs', count: p.ladybugs });
     if (water) goals.unshift({ type: 'flood' });
     if (slime) goals.unshift({ type: 'slime' });
+    if (fire) goals.unshift({ type: 'fire' });
     // Freeze over some hazard cells (hazards under ice).
-    for (const extra of [waterIce, slimeIce]) if (extra) ice = mergeIce(ice, extra, layout);
+    for (const extra of [waterIce, slimeIce, fireIce]) if (extra) ice = mergeIce(ice, extra, layout);
     let anchorDrops: number | undefined;
     if (p.anchors) {
       anchorDrops = Math.max(0, Math.round(count * p.anchors.dropsPerSize));
@@ -237,6 +241,7 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
       ...(ice ? { ice } : {}),
       ...(water ? { water } : {}),
       ...(slime ? { slime } : {}),
+      ...(fire ? { fire } : {}),
       goals,
     }, 'candidate');
   };

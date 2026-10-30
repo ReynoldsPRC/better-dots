@@ -56,8 +56,9 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   const { wallRight, wallDown } = placeWalls(level, rows, cols);
 
   const boardRng = new Rng(seedRng(level.seed));
+  const burningAtStart = (i: number) => (level.fire?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x';
   for (let i = 0; i < cells.length; i++) {
-    if (playable[i] && cells[i] === null) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
+    if (playable[i] && cells[i] === null && !burningAtStart(i)) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
   }
 
   const ice = cells.map((_, i) => {
@@ -70,6 +71,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   const marked = (g: string[] | undefined) => cells.map((_, i) => (g?.[Math.floor(i / cols)]?.[i % cols] ?? '.') === 'x');
   const water = marked(level.water);
   const slime = marked(level.slime);
+  const fire = marked(level.fire);
 
   const startAnchors = cells.filter((p) => p?.kind === 'anchor').length;
   const state: GameState = {
@@ -79,7 +81,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     wallRight,
     wallDown,
     cells,
-    layers: { ice, water, slime },
+    layers: { ice, water, slime, fire },
     colors: level.colors.slice(),
     rng: 0,
     nextId,
@@ -128,6 +130,8 @@ export function goalRemaining(s: GameState, g: GoalState): number {
       return s.playable.filter((p, i) => p && !s.layers.water[i]).length;
     case 'slime':
       return s.layers.slime.filter(Boolean).length;
+    case 'fire':
+      return s.layers.fire.filter(Boolean).length;
     default:
       return Math.max(0, g.goal.count - g.progress);
   }
@@ -155,11 +159,11 @@ export function hasMove(s: GameState, cells: Cells = s.cells): boolean {
 
 /** Cells that never move: their pieces stay put and gravity stops at them. */
 function isFixed(s: GameState, i: number): boolean {
-  return s.layers.ice[i] > 0;
+  return s.layers.ice[i] > 0 || s.layers.fire[i];
 }
 
 function cloneLayers(l: Layers): Layers {
-  return { ice: l.ice.slice(), water: l.water.slice(), slime: l.slime.slice() };
+  return { ice: l.ice.slice(), water: l.water.slice(), slime: l.slime.slice(), fire: l.fire.slice() };
 }
 
 /**
@@ -206,6 +210,8 @@ class Move {
   private bombCells = new Set<number>();
   /** Slimed cells cleaned this move. */
   slimeCleaned = 0;
+  /** Fires put out this move. */
+  fireOut = 0;
   /** Gems already set off this move (by piece id), so each goes off once. */
   private readonly triggered = new Set<number>();
   /** Gems set off during the current blast wave; they fire in the next. */
@@ -322,6 +328,7 @@ class Move {
    * End-of-cascade layer effects, in order:
    * - Water: cleared cells touching active water become watered, and the flood
    *   carries on through every connected cleared cell.
+   * - Active fire next to a cleared cell goes out.
    * - Slime on a cleared cell is cleaned.
    * - Ice loses one layer if a cell next to it was cleared or a blast reached it
    *   (one layer per move at most). Hazards under it wake up from then on.
@@ -345,6 +352,16 @@ class Move {
     for (const i of [...flooded].sort((a, b) => a - b)) {
       layers.water[i] = true;
       changed.push(i);
+    }
+
+    // Fire: clearing a cell next to active fire puts it out; the cell then refills.
+    const burningNow = layers.fire.flatMap((f, i) => (f && layers.ice[i] === 0 ? [i] : []));
+    for (const i of burningNow) {
+      if (orthogonal(s, i).some((j) => this.cleared.has(j))) {
+        layers.fire[i] = false;
+        this.fireOut++;
+        changed.push(i);
+      }
     }
 
     // Slime: clearing a piece on a slimed cell cleans it.
@@ -398,22 +415,37 @@ class Move {
   }
 
   /**
-   * After the board settles: if no slime was cleaned this move, active slime
-   * spreads to one neighboring clean cell (seeded).
+   * After the board settles, ignored hazards grow (seeded picks):
+   * - Fire, if none went out this move, spreads to one neighboring cell and
+   *   destroys its dot (cells with other pieces are safe).
+   * - Slime, if none was cleaned this move, spreads to one neighboring clean cell.
    */
   spread(): void {
-    const { s, layers } = this;
-    if (this.slimeCleaned > 0) return;
-    const active = (i: number) => layers.slime[i] && layers.ice[i] === 0;
-    const options = new Set<number>();
-    for (let i = 0; i < layers.slime.length; i++) {
-      if (!active(i)) continue;
-      for (const j of orthogonal(s, i)) if (!layers.slime[j] && layers.ice[j] === 0) options.add(j);
+    const { s, layers, cells } = this;
+    const unfrozen = (i: number) => layers.ice[i] === 0;
+    const pickNext = (layer: boolean[], ok: (j: number) => boolean): number | null => {
+      const options = new Set<number>();
+      for (let i = 0; i < layer.length; i++) {
+        if (!layer[i] || !unfrozen(i)) continue;
+        for (const j of orthogonal(s, i)) if (!layer[j] && unfrozen(j) && ok(j)) options.add(j);
+      }
+      return options.size === 0 ? null : this.rng.pick([...options].sort((a, b) => a - b));
+    };
+    if (this.fireOut === 0) {
+      const target = pickNext(layers.fire, (j) => cells[j] === null || cells[j]!.kind === 'dot');
+      if (target !== null) {
+        layers.fire[target] = true;
+        cells[target] = null;
+        this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: [target] });
+      }
     }
-    if (options.size === 0) return;
-    const target = this.rng.pick([...options].sort((a, b) => a - b));
-    layers.slime[target] = true;
-    this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: [target] });
+    if (this.slimeCleaned === 0) {
+      const target = pickNext(layers.slime, (j) => !layers.fire[j]);
+      if (target !== null) {
+        layers.slime[target] = true;
+        this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: [target] });
+      }
+    }
   }
 
   /** Lowest cell of a column, where anchors sink. */
@@ -425,8 +457,8 @@ class Move {
   /**
    * Gravity and refill. Each column splits into runs between fixed cells;
    * pieces fall to the bottom of their run, and empty tops refill. New pieces
-   * in the top run come from above the board; lower runs refill from under
-   * the fixed cell above them.
+   * in the top run fall in from above the board; in lower runs (under a fixed
+   * cell) they appear in place.
    */
   fall(): void {
     const { cells, rng } = this;
@@ -442,7 +474,9 @@ class Move {
         run.forEach((i, k) => {
           if (k < empty) {
             cells[i] = null;
-            slots.push({ i, startRow: Math.floor(i / s.cols) - (lowestNew - boundary), top: boundary === -1 });
+            // From above the board in the top run; in place (they appear) under a fixed cell.
+            const row = Math.floor(i / s.cols);
+            slots.push({ i, startRow: boundary === -1 ? row - (lowestNew - boundary) : row, top: boundary === -1 });
           } else {
             cells[i] = pieces[k - empty];
           }
@@ -523,6 +557,7 @@ function progressFor(g: GoalState, t: Tally): number {
       return t.ice;
     case 'flood':
     case 'slime':
+    case 'fire':
       return 0;
     case 'gems':
       return t.gems;

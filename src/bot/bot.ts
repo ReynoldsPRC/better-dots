@@ -97,7 +97,8 @@ function findLoop(s: GameState, group: number[]): number[] | null {
 /**
  * Cells worth clearing for reasons a plain "clear the most" search misses:
  * the cells under anchors (so they drop), next to ice (to crack it), and dry
- * cells next to active water (to spread it), ladybugs, and slimed cells.
+ * cells next to active water (to spread it), ladybugs, slimed cells, and
+ * cells next to fire (to put it out).
  */
 export function targetCells(s: GameState): Set<number> {
   const out = new Set<number>();
@@ -112,6 +113,7 @@ export function targetCells(s: GameState): Set<number> {
     if (s.layers.ice[i] > 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
     if (p?.kind === 'ladybug' && s.layers.ice[i] === 0) out.add(i);
     if (s.layers.slime[i] && s.layers.ice[i] === 0 && p) out.add(i);
+    if (s.layers.fire[i] && s.layers.ice[i] === 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
   });
   return out;
 }

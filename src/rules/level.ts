@@ -53,37 +53,6 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
 
   const cellAt = (r: number, c: number) => isInt(r) && isInt(c) && r >= 0 && c >= 0 && r < rows.length && c < rows[0].length && rows[r][c] !== '-';
 
-  let pieces: PlacedPiece[] | undefined;
-  if (o.pieces !== undefined) {
-    if (!Array.isArray(o.pieces)) fail('"pieces" must be a list');
-    const taken = new Set<string>();
-    pieces = (o.pieces as unknown[]).map((x, k): PlacedPiece => {
-      const po = x as Record<string, unknown>;
-      if (!cellAt(po?.r as number, po?.c as number)) fail(`piece ${k}: "r" and "c" must name a cell of the layout`);
-      const at = `${po.r},${po.c}`;
-      if (taken.has(at)) fail(`piece ${k}: another piece is already at row ${po.r}, col ${po.c}`);
-      taken.add(at);
-      const r = po.r as number;
-      const c = po.c as number;
-      switch (po.type) {
-        case 'anchor':
-          return { r, c, type: 'anchor' };
-        case 'gem':
-          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: gem color must be one of "colors"`);
-          if (po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "column" or "cross"`);
-          return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as 'column' | 'cross' };
-        case 'ladybug': {
-          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: ladybug color must be one of "colors"`);
-          if (po.spots !== undefined && !(isInt(po.spots) && po.spots >= 1 && po.spots <= 3)) fail(`piece ${k}: ladybug spots must be 1-3`);
-          return { r, c, type: 'ladybug', color: po.color as ColorId, ...(po.spots !== undefined ? { spots: po.spots as number } : {}) };
-        }
-        default:
-          return fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
-      }
-    });
-  }
-  const startAnchors = (pieces ?? []).filter((p) => p.type === 'anchor').length;
-
   /** An optional per-cell grid with the same shape as the layout. */
   const grid = (key: string, allowed: RegExp, what: string): string[] | undefined => {
     const g = o[key];
@@ -102,6 +71,43 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
   const iceCells = (ice ?? []).join('').replace(/\./g, '').length;
   const water = grid('water', /^x$/, 'x for watered');
   const slime = grid('slime', /^x$/, 'x for slimed');
+  const fire = grid('fire', /^x$/, 'x for burning');
+  const burning = (r: number, c: number) => fire?.[r][c] === 'x';
+  fire?.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === 'x' && rows[r][c] !== '.') fail(`"fire" at row ${r}, col ${c}: a burning cell holds no dot, so its layout must be "."`);
+  }));
+
+  let pieces: PlacedPiece[] | undefined;
+  if (o.pieces !== undefined) {
+    if (!Array.isArray(o.pieces)) fail('"pieces" must be a list');
+    const taken = new Set<string>();
+    pieces = (o.pieces as unknown[]).map((x, k): PlacedPiece => {
+      const po = x as Record<string, unknown>;
+      if (!cellAt(po?.r as number, po?.c as number)) fail(`piece ${k}: "r" and "c" must name a cell of the layout`);
+      const at = `${po.r},${po.c}`;
+      if (taken.has(at)) fail(`piece ${k}: another piece is already at row ${po.r}, col ${po.c}`);
+      taken.add(at);
+      const r = po.r as number;
+      const c = po.c as number;
+      if (burning(r, c)) fail(`piece ${k}: row ${r}, col ${c} is burning and can't hold a piece`);
+      switch (po.type) {
+        case 'anchor':
+          return { r, c, type: 'anchor' };
+        case 'gem':
+          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: gem color must be one of "colors"`);
+          if (po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "column" or "cross"`);
+          return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as 'column' | 'cross' };
+        case 'ladybug': {
+          if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: ladybug color must be one of "colors"`);
+          if (po.spots !== undefined && !(isInt(po.spots) && po.spots >= 1 && po.spots <= 3)) fail(`piece ${k}: ladybug spots must be 1-3`);
+          return { r, c, type: 'ladybug', color: po.color as ColorId, ...(po.spots !== undefined ? { spots: po.spots as number } : {}) };
+        }
+        default:
+          return fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
+      }
+    });
+  }
+  const startAnchors = (pieces ?? []).filter((p) => p.type === 'anchor').length;
 
   let anchorDrops: number | undefined;
   if (o.anchorDrops !== undefined) {
@@ -131,6 +137,9 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
       case 'slime':
         if (!slime) fail(`goal ${k}: a slime goal needs some starting "slime"`);
         return { type: 'slime' };
+      case 'fire':
+        if (!fire) fail(`goal ${k}: a fire goal needs some starting "fire"`);
+        return { type: 'fire' };
       case 'gems': {
         const count = positive(go.count, k);
         const have = (pieces ?? []).filter((p) => p.type === 'gem').length;
@@ -175,6 +184,7 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     ice,
     water,
     slime,
+    fire,
     goals,
     stars,
   };

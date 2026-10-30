@@ -47,6 +47,7 @@ export function drawScene(
   drawTerrain(ctx, layout, state, theme);
   drawWater(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
   drawSlime(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
+  drawFire(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
 
   const dragColor = drag && drag.path.length > 0 ? connectableColor(state, drag.path[0]) : null;
 
@@ -244,6 +245,44 @@ function drawSlime(
     ctx.arc(cx - rad * 0.55, cy + rad * 0.45, rad * 0.12, 0, Math.PI * 2);
     ctx.arc(cx + rad * 0.6, cy - rad * 0.5, rad * 0.09, 0, Math.PI * 2);
     ctx.fill();
+  }
+}
+
+/**
+ * A burning cell: a charcoal tile with a two-tone flame. New fires flare up;
+ * fires put out shrink away.
+ */
+function drawFire(
+  ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers, changed: LayerChange[], theme: Theme,
+) {
+  const { cell, x0, y0 } = layout;
+  const t = config.fire;
+  const step = new Map(changed.filter((c) => c.layer === 'fire').map((c) => [c.cell, c.progress]));
+  for (let i = 0; i < layers.fire.length; i++) {
+    const g = step.get(i);
+    if (!layers.fire[i] && g === undefined) continue;
+    const k = g === undefined ? 1 : layers.fire[i] ? ease('easeOutCubic', g) : 1 - ease('easeInQuad', g);
+    if (k <= 0) continue;
+    const cx = x0 + (i % s.cols + 0.5) * cell;
+    const cy = y0 + (Math.floor(i / s.cols) + 0.5) * cell;
+    const size = cell * t.scale;
+    ctx.globalAlpha = Math.min(1, k * 1.5);
+    ctx.fillStyle = t.tile[theme];
+    ctx.beginPath();
+    ctx.roundRect(cx - size / 2, cy - size / 2, size, size, cell * t.radius);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    const flame = (h: number, w: number, color: string) => {
+      const base = cy + cell * t.flame * 0.42;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(cx, base - h);
+      ctx.bezierCurveTo(cx + w * 0.9, base - h * 0.55, cx + w, base - h * 0.1, cx, base);
+      ctx.bezierCurveTo(cx - w, base - h * 0.1, cx - w * 0.9, base - h * 0.55, cx, base - h);
+      ctx.fill();
+    };
+    flame(cell * t.flame * k, cell * 0.22 * k, t.outer[theme]);
+    flame(cell * t.flame * 0.55 * k, cell * 0.12 * k, t.inner[theme]);
   }
 }
 

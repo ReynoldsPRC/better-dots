@@ -67,6 +67,17 @@ export function goalIcon(goal: Goal, colorblind: boolean, size = 22): HTMLCanvas
     case 'ladybugs':
       drawPiece(ctx, { kind: 'ladybug', id: 0, color: 0, spots: 3 }, r, r * 1.08, r * 0.78, { theme, colorblind: false });
       break;
+    case 'fire': {
+      ctx.fillStyle = config.fire.outer[theme];
+      const h = size * 0.85;
+      const base = size * 0.92;
+      ctx.beginPath();
+      ctx.moveTo(r, base - h);
+      ctx.bezierCurveTo(r + size * 0.36, base - h * 0.55, r + size * 0.4, base - h * 0.1, r, base);
+      ctx.bezierCurveTo(r - size * 0.4, base - h * 0.1, r - size * 0.36, base - h * 0.55, r, base - h);
+      ctx.fill();
+      break;
+    }
     case 'slime':
       ctx.fillStyle = config.slime.fill[theme];
       ctx.beginPath();
