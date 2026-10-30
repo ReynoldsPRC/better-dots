@@ -1,0 +1,22 @@
+{
+  "seed": 122501,
+  "moves": 16,
+  "colors": [1, 2, 4],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "pieces": [
+    { "r": 0, "c": 2, "type": "anchor" }
+  ],
+  "anchorDrops": 3,
+  "goals": [
+    { "type": "anchors", "count": 4 }
+  ],
+  "stars": { "two": 13, "three": 12 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 14, "p10": 12 }
+}

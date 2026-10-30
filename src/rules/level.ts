@@ -1,6 +1,6 @@
 // Level data: checks a parsed level file and scores a finished attempt.
 import { config } from '../config';
-import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type Wall } from './types';
+import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type PlacedPiece, type Wall } from './types';
 
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLORS;
@@ -51,13 +51,49 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     });
   }
 
+  const cellAt = (r: number, c: number) => isInt(r) && isInt(c) && r >= 0 && c >= 0 && r < rows.length && c < rows[0].length && rows[r][c] !== '-';
+
+  let pieces: PlacedPiece[] | undefined;
+  if (o.pieces !== undefined) {
+    if (!Array.isArray(o.pieces)) fail('"pieces" must be a list');
+    const taken = new Set<string>();
+    pieces = (o.pieces as unknown[]).map((x, k): PlacedPiece => {
+      const po = x as Record<string, unknown>;
+      if (!cellAt(po?.r as number, po?.c as number)) fail(`piece ${k}: "r" and "c" must name a cell of the layout`);
+      const at = `${po.r},${po.c}`;
+      if (taken.has(at)) fail(`piece ${k}: another piece is already at row ${po.r}, col ${po.c}`);
+      taken.add(at);
+      if (po.type !== 'anchor') fail(`piece ${k}: unknown type ${JSON.stringify(po.type)}`);
+      return { r: po.r as number, c: po.c as number, type: 'anchor' };
+    });
+  }
+  const startAnchors = (pieces ?? []).filter((p) => p.type === 'anchor').length;
+
+  let anchorDrops: number | undefined;
+  if (o.anchorDrops !== undefined) {
+    if (!isInt(o.anchorDrops) || o.anchorDrops < 0) fail('"anchorDrops" must be a whole number');
+    anchorDrops = o.anchorDrops as number;
+  }
+
   if (!Array.isArray(o.goals) || o.goals.length === 0) fail('"goals" must be a non-empty list');
+  const positive = (v: unknown, k: number) => {
+    if (!isInt(v) || v < 1) fail(`goal ${k}: "count" must be a positive integer`);
+    return v as number;
+  };
   const goals = (o.goals as unknown[]).map((g, k): Goal => {
     const go = g as Record<string, unknown>;
-    if (go?.type !== 'collect') fail(`goal ${k}: unknown type ${JSON.stringify(go?.type)}`);
-    if (!isColor(go.color) || !(colors as number[]).includes(go.color)) fail(`goal ${k}: color must be one of "colors"`);
-    if (!isInt(go.count) || (go.count as number) < 1) fail(`goal ${k}: "count" must be a positive integer`);
-    return { type: 'collect', color: go.color as ColorId, count: go.count as number };
+    switch (go?.type) {
+      case 'collect':
+        if (!isColor(go.color) || !(colors as number[]).includes(go.color)) fail(`goal ${k}: color must be one of "colors"`);
+        return { type: 'collect', color: go.color as ColorId, count: positive(go.count, k) };
+      case 'anchors': {
+        const count = positive(go.count, k);
+        if (count > startAnchors + (anchorDrops ?? 0)) fail(`goal ${k}: needs ${count} anchors but the level only has ${startAnchors + (anchorDrops ?? 0)}`);
+        return { type: 'anchors', count };
+      }
+      default:
+        return fail(`goal ${k}: unknown type ${JSON.stringify(go?.type)}`);
+    }
   });
 
   let stars: LevelDef['stars'];
@@ -77,6 +113,8 @@ export function parseLevel(raw: unknown, id: string): LevelDef {
     colors: (colors as ColorId[]).slice(),
     layout: rows.slice(),
     walls,
+    pieces,
+    anchorDrops,
     goals,
     stars,
   };

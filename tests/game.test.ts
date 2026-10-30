@@ -3,7 +3,7 @@ import {
   addMoves, applyMove, createGame, hasMove, movesLeft, Rng, seedRng,
   type ColorId, type GameState, type LevelDef,
 } from '../src/rules';
-import { at, cells, colors, game } from './helpers';
+import { at, cells, colorOf, colors, game } from './helpers';
 
 const ids = (s: GameState) => s.cells.map((p) => p?.id ?? null);
 
@@ -13,8 +13,8 @@ describe('createGame', () => {
     const a = createGame(level);
     const b = createGame(level);
     expect(colors(a)).toEqual(colors(b));
-    expect(a.cells[0]?.color).toBe(0);
-    for (const p of a.cells.slice(1)) expect([1, 2]).toContain(p?.color);
+    expect(colorOf(a.cells[0])).toBe(0);
+    for (const p of a.cells.slice(1)) expect([1, 2]).toContain(colorOf(p));
   });
 
   it('gives every piece a unique id', () => {
@@ -76,7 +76,7 @@ describe('line clears and gravity', () => {
       const pair = firstPair(s)!;
       s = applyMove(s, pair).state;
     }
-    for (const p of s.cells) expect([0, 3, 4]).toContain(p!.color);
+    for (const p of s.cells) expect([0, 3, 4]).toContain(colorOf(p));
   });
 
   it('throws on an invalid path or a finished game', () => {
@@ -119,7 +119,7 @@ describe('loops and bombs', () => {
     const s = game(RING);
     const { result } = applyMove(s, ring(s));
     expect(result.steps).toHaveLength(2);
-    expect(result.steps[1]).toEqual({ kind: 'bomb', cells: cells(s, [1, 1]), sources: cells(s, [1, 1]) });
+    expect(result.steps[1]).toEqual({ kind: 'blast', cells: cells(s, [1, 1]), sources: [{ cell: at(s, 1, 1), type: 'bomb' }] });
   });
 
   it('a bomb clears the cells around it', () => {
@@ -242,8 +242,8 @@ function allPairs(s: GameState): number[][] {
     const a = s.cells[i];
     if (!a) continue;
     const c = i % s.cols;
-    if (c + 1 < s.cols && s.cells[i + 1]?.color === a.color) out.push([i, i + 1]);
-    if (i + s.cols < s.cells.length && s.cells[i + s.cols]?.color === a.color) out.push([i, i + s.cols]);
+    if (c + 1 < s.cols && colorOf(s.cells[i + 1]) === colorOf(a)) out.push([i, i + 1]);
+    if (i + s.cols < s.cells.length && colorOf(s.cells[i + s.cols]) === colorOf(a)) out.push([i, i + s.cols]);
   }
   return out;
 }
@@ -256,8 +256,8 @@ function findSquare(s: GameState): number[] | null {
   for (let r = 0; r + 1 < s.rows; r++) {
     for (let c = 0; c + 1 < s.cols; c++) {
       const [a, b, d, e] = [at(s, r, c), at(s, r, c + 1), at(s, r + 1, c + 1), at(s, r + 1, c)];
-      const col = s.cells[a]?.color;
-      if ([b, d, e].every((i) => s.cells[i]?.color === col)) return [a, b, d, e, a];
+      const col = colorOf(s.cells[a]);
+      if ([b, d, e].every((i) => colorOf(s.cells[i]) === col)) return [a, b, d, e, a];
     }
   }
   return null;

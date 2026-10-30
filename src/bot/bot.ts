@@ -94,8 +94,21 @@ function findLoop(s: GameState, group: number[]): number[] | null {
   return null;
 }
 
-/** The longest simple line found within a search budget. */
-function longestLine(s: GameState, group: number[], budget: number): number[] {
+/**
+ * Cells worth clearing for reasons a plain "clear the most" search misses:
+ * the cells under anchors (so they drop).
+ */
+export function targetCells(s: GameState): Set<number> {
+  const out = new Set<number>();
+  s.cells.forEach((p, i) => {
+    if (p?.kind !== 'anchor') return;
+    for (let j = i + s.cols; j < s.cells.length; j += s.cols) if (s.cells[j]) out.add(j);
+  });
+  return out;
+}
+
+/** The longest simple line found within a search budget, optionally starting from one cell. */
+function longestLine(s: GameState, group: number[], budget: number, from?: number): number[] {
   const inGroup = new Set(group);
   let best: number[] = [];
   let steps = 0;
@@ -112,7 +125,7 @@ function longestLine(s: GameState, group: number[], budget: number): number[] {
     path.pop();
     onPath.delete(a);
   };
-  for (const start of group) {
+  for (const start of from === undefined ? group : [from]) {
     if (steps > budget || best.length === group.length) break;
     dfs(start);
   }
@@ -121,26 +134,45 @@ function longestLine(s: GameState, group: number[], budget: number): number[] {
 
 export function candidateMoves(s: GameState, budget = DEFAULTS.pathBudget): number[][] {
   const out: number[][] = [];
+  const targets = targetCells(s);
   for (const g of groups(s)) {
     const loop = g.length >= 4 ? findLoop(s, g) : null;
     if (loop) out.push(loop);
     out.push(g.length === 2 ? g : longestLine(s, g, budget));
+    if (g.length > 2) for (const t of g) if (targets.has(t)) out.push(longestLine(s, g, budget / 4, t));
   }
   return out;
 }
 
 /**
  * Score for the board after a move: goal progress (each goal normalized by its
- * starting size), plus a nudge for clearing more.
+ * starting size), plus nudges toward progress the goals can't see yet.
  */
 export function progressScore(before: GameState, after: GameState, startRemaining: number[]): number {
   let score = 0;
   after.goals.forEach((g, k) => {
     const was = goalRemaining(before, before.goals[k]);
     const now = goalRemaining(after, g);
-    score += (was - now) / Math.max(1, startRemaining[k]);
+    const share = 1 / Math.max(1, startRemaining[k]);
+    score += (was - now) * share;
+    // Anchors: reward moving them down, a fraction of what sinking one is worth.
+    if (g.goal.type === 'anchors' && now > 0) score += 0.8 * share * anchorDescent(before, after);
   });
   return score;
+}
+
+/** How many rows the anchors on both boards moved down, as a fraction of board height. */
+function anchorDescent(before: GameState, after: GameState): number {
+  const rowOf = (s: GameState) => {
+    const m = new Map<number, number>();
+    s.cells.forEach((p, i) => p?.kind === 'anchor' && m.set(p.id, Math.floor(i / s.cols)));
+    return m;
+  };
+  const a = rowOf(before);
+  const b = rowOf(after);
+  let total = 0;
+  for (const [id, r] of b) if (a.has(id)) total += r - a.get(id)!;
+  return total / before.rows;
 }
 
 export interface RunResult {
@@ -162,15 +194,25 @@ export function playOnce(level: LevelDef, playSeed: number, moveCap?: number, op
 
   while (s.status === 'playing') {
     const moves = candidateMoves(s, o.pathBudget);
+    const targets = targetCells(s);
+    const nearTarget = new Set<number>();
+    for (const t of targets) for (const n of neighbors(s, t)) if (!targets.has(n)) nearTarget.add(n);
     let best: GameState | null = null;
     let bestScore = -Infinity;
     for (const path of moves) {
       const { state, result } = applyMove(s, path);
-      const cleared = result.steps.reduce((n, st) => n + st.cells.length, 0);
+      let cleared = 0;
+      let near = 0;
+      for (const st of result.steps) {
+        cleared += st.cells.length;
+        for (const i of st.cells) if (nearTarget.has(i)) near++;
+      }
       const score =
         (state.status === 'won' ? 100 : 0) +
         progressScore(s, state, startRemaining) +
         0.002 * cleared +
+        // Clearing next to a stuck target brings it new neighbors.
+        0.006 * near +
         o.noise * rng.float() * 0.1;
       if (score > bestScore) {
         bestScore = score;

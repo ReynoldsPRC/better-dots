@@ -22,4 +22,10 @@ export const presets: Record<number, Preset> = {
     rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: lerp(3, 5, t), walls: lerp(4, 12, t), holes: lerp(0, 4, t),
     collectGoals: lerp(1, 3, t), targetMoves: [lerp(14, 22, t), lerp(20, 32, t)],
   }),
+  // World 4: anchors.
+  4: (t) => ({
+    rows: lerp(6, 7, t), cols: lerp(6, 7, t), colors: lerp(3, 5, t), holes: lerp(0, 4, t), walls: lerp(0, 4, t),
+    collectGoals: lerp(0, 1, t), anchors: { start: lerp(1, 3, t), dropsPerSize: 1 / 6 },
+    targetMoves: [lerp(12, 20, t), lerp(18, 30, t)],
+  }),
 };

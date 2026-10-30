@@ -1,0 +1,26 @@
+{
+  "seed": 780095,
+  "moves": 19,
+  "colors": [2, 3, 4],
+  "layout": [
+    ".-..-.",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "walls": [
+    { "r": 2, "c": 0, "side": "down" },
+    { "r": 2, "c": 5, "side": "down" }
+  ],
+  "pieces": [
+    { "r": 1, "c": 1, "type": "anchor" }
+  ],
+  "anchorDrops": 5,
+  "goals": [
+    { "type": "anchors", "count": 6 }
+  ],
+  "stars": { "two": 15, "three": 14 },
+  "bot": { "runs": 100, "winRate": 0.79, "median": 16, "p10": 14 }
+}

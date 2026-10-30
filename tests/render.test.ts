@@ -38,7 +38,7 @@ describe('move animation timeline', () => {
     const anim = new MoveAnimation(s, result, state, 1000);
 
     const first = anim.frame(1000);
-    expect(first.sprites).toHaveLength(12 + 2); // 12 old dots (2 popping) + 2 new above the board
+    expect(first.sprites).toHaveLength(12); // 10 staying + 2 popping; new dots appear once the fall starts
     const above = first.sprites.find((p) => p.id === s.cells[at(s, 0, 0)]!.id)!;
     expect([above.r, above.c]).toEqual([0, 0]);
 
@@ -55,7 +55,8 @@ describe('move animation timeline', () => {
     const s = game(BOARD);
     const { state, result } = applyMove(s, cells(s, [0, 2], [1, 2], [2, 2]));
     const anim = new MoveAnimation(s, result, state, 0);
-    const f = anim.frame(0);
+    const fallStart = Math.max(config.cascade.stepMs, config.clear.popMs);
+    const f = anim.frame(fallStart + 1);
     const spawned = f.sprites.filter((p) => result.spawned.includes(p.id));
     expect(spawned).toHaveLength(3);
     for (const p of spawned) expect(p.r).toBeLessThan(0);

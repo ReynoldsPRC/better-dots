@@ -1,4 +1,4 @@
-import { createGame, type ColorId, type GameState, type Goal, type LevelDef } from '../src/rules';
+import { createGame, type ColorId, type GameState, type Goal, type LevelDef, type Piece } from '../src/rules';
 
 /** A game from a fixed layout of color digits. */
 export function game(layout: string[], extra: Partial<LevelDef> = {}, playSeed = 1): GameState {
@@ -32,9 +32,14 @@ export function colors(s: GameState, board = s.cells): string[] {
     for (let c = 0; c < s.cols; c++) {
       const i = r * s.cols + c;
       const p = board[i];
-      row += !s.playable[i] ? '-' : p ? String(p.color) : ' ';
+      row += !s.playable[i] ? '-' : p ? (p.kind === 'dot' ? String(p.color) : 'A') : ' ';
     }
     out.push(row);
   }
   return out;
+}
+
+/** A piece's color, or undefined for pieces without one. */
+export function colorOf(p: Piece | null | undefined): ColorId | undefined {
+  return p && 'color' in p ? p.color : undefined;
 }

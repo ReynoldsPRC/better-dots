@@ -1,6 +1,6 @@
 // Level generator: builds candidate levels from parameters, then lets the bot
 // set the goal size, move limit, and star cutoffs. Seeded and pure.
-import { parseLevel, Rng, seedRng, type ColorId, type Goal, type LevelDef, type Wall } from '../rules';
+import { parseLevel, Rng, seedRng, type ColorId, type Goal, type LevelDef, type PlacedPiece, type Wall } from '../rules';
 import { analyzeLevel, tuneFromStats, type LevelStats } from './bot';
 import type { BotNote } from './format';
 
@@ -15,6 +15,8 @@ export interface GenParams {
   walls?: number;
   /** How many collect-color goals. */
   collectGoals: number;
+  /** Anchor goal: anchors on the board at the start, plus drops that scale with goal size. */
+  anchors?: { start: number; dropsPerSize: number };
   /** The move limit should land in this range. */
   targetMoves: [number, number];
   /** Bot runs per measurement. */
@@ -25,6 +27,9 @@ export interface Candidate {
   level: LevelDef;
   bot: BotNote;
 }
+
+/** Smaller collect goals aren't worth showing. */
+const MIN_COLLECT = 8;
 
 const mirrorCol = (cols: number, c: number) => cols - 1 - c;
 
@@ -97,6 +102,21 @@ function makeWalls(p: GenParams, layout: string[], rng: Rng): Wall[] {
   return walls;
 }
 
+/** Places the level's starting pieces (anchors in the top rows, away from the bottom). */
+function placePieces(p: GenParams, layout: string[], rng: Rng): PlacedPiece[] {
+  const out: PlacedPiece[] = [];
+  const taken = new Set<number>();
+  const want = p.anchors?.start ?? 0;
+  for (let guard = 0; out.length < want && guard < 500; guard++) {
+    const r = rng.int(Math.max(1, Math.floor(p.rows / 2)));
+    const c = rng.int(p.cols);
+    if (layout[r][c] === '-' || taken.has(r * p.cols + c)) continue;
+    taken.add(r * p.cols + c);
+    out.push({ r, c, type: 'anchor' });
+  }
+  return out;
+}
+
 /** Builds one candidate, or null if the bot couldn't make it fit the target. */
 export function generateCandidate(p: GenParams, seed: number, name?: string): Candidate | null {
   const rng = new Rng(seedRng(seed));
@@ -105,22 +125,32 @@ export function generateCandidate(p: GenParams, seed: number, name?: string): Ca
   const walls = makeWalls(p, layout, rng);
   const goalColors = rng.shuffle(palette).slice(0, p.collectGoals).sort((a, b) => a - b);
   const runs = p.runs ?? 40;
+  const pieces = placePieces(p, layout, rng);
 
-  const build = (count: number, moves: number): LevelDef =>
-    parseLevel({
+  const build = (count: number, moves: number): LevelDef => {
+    const goals: Goal[] = goalColors.map((color): Goal => ({ type: 'collect', color, count: Math.max(MIN_COLLECT, count) }));
+    let anchorDrops: number | undefined;
+    if (p.anchors) {
+      anchorDrops = Math.max(0, Math.round(count * p.anchors.dropsPerSize));
+      goals.unshift({ type: 'anchors', count: p.anchors.start + anchorDrops });
+    }
+    return parseLevel({
       ...(name ? { name } : {}),
       seed: rng.int(1_000_000),
       moves,
       colors: palette,
       layout,
       ...(walls.length ? { walls } : {}),
-      goals: goalColors.map((color): Goal => ({ type: 'collect', color, count })),
+      ...(pieces.length ? { pieces } : {}),
+      ...(anchorDrops ? { anchorDrops } : {}),
+      goals,
     }, 'candidate');
+  };
 
   // Measure with a starting goal size, then scale it so the bot's needs land mid-range.
   const [lo, hi] = p.targetMoves;
   const mid = (lo + hi) / 2;
-  let count = 12;
+  let count = p.collectGoals > 0 ? 12 : 18;
   let level = build(count, hi);
   let stats: LevelStats = analyzeLevel(level, runs, seed);
   for (let pass = 0; pass < 3; pass++) {

@@ -37,8 +37,10 @@ Non-negotiable. Don't add any of these, even as an option:
 ### Layout and commands
 
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
-- `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` (clear stages, settled board, spawned ids) that the render layer animates.
+- `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` whose `events` list what happened in order (`clear` stages, `fall`, `sink`, `shuffle`, ...), each with the board after it. `src/render/animation.ts` replays that list, so a new mechanic adds an event kind and a way to draw it.
+- Gravity works per column in runs between fixed cells (frozen or burning cells, once those exist). Pieces fall to the bottom of their run. The top run refills from above the board; a run under a fixed cell refills from under it.
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
+- Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`) and `anchorDrops` (how many more anchors drop in). A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than the level started with (at least one), until drops run out. Anchor goals: `{ "type": "anchors", "count" }`.
 - `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). Level ids are `N-NN` from that position. `src/levels.ts` bundles them at build time; `tests/level.test.ts` checks every shipped file. Level file fields: `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot, `-` no cell), `walls` (optional list of `{ "r", "c", "side": "up" | "down" | "left" | "right" }`, each between two cells), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
 - `src/progress.ts`: save format and unlock/star bookkeeping (pure). `src/ui/storage.ts`: localStorage key `better-dots-save`, export/import as a JSON file from Settings. Developer switch: Settings toggle, or `?dev` in the URL.
 - Worlds 1-3 (core, shaped boards, walls) were hand-made, then scored by the bot.
@@ -76,7 +78,8 @@ Each one is introduced in its own world (see Build order).
 
 ### Anchors
 - Not connectable. Fall with gravity like dots.
-- Sink when they reach the bottom of their column: removed and counted toward the anchor goal.
+- Sink when they reach the bottom of their column (its lowest cell, even on shaped boards): removed and counted toward the anchor goal.
+- Bombs and beams don't affect anchors, and a loop around an anchor doesn't make it a bomb. Anchors only leave by sinking. Reshuffles leave them in place.
 - Level data sets the starting anchors and how many more can drop in from the top.
 
 ### Ice
@@ -171,6 +174,7 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 - Bomb radius: 8 neighbors
 - Ice: one layer per move; frozen dots can't be connected
 - Walls don't block falling
+- Anchors ignore bombs and beams; one new anchor drops in at a time
 - Water floods the whole cleared line
 - Fire and slime spread one cell per move
 - Star cutoffs

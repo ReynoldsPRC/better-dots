@@ -1,6 +1,6 @@
 // Draws the board: background, connection line, dots, and effects.
 import { config } from '../config';
-import type { ColorId, GameState } from '../rules';
+import { connectableColor, type ColorId, type GameState, type Piece } from '../rules';
 import type { Surface, Theme } from './canvas';
 import type { Frame, SpriteFrame } from './animation';
 import { toScreen, type Layout } from './layout';
@@ -45,7 +45,7 @@ export function drawScene(
 
   drawTerrain(ctx, layout, state, theme);
 
-  const dragColor = drag && drag.path.length > 0 ? state.cells[drag.path[0]]?.color ?? null : null;
+  const dragColor = drag && drag.path.length > 0 ? connectableColor(state, drag.path[0]) : null;
 
   // Board-wide tints: the loop pulse after a move, a faint wash while a loop is held.
   if (frame?.pulse) {
@@ -80,12 +80,14 @@ export function drawScene(
   const sprites: SpriteFrame[] = frame
     ? frame.sprites
     : state.cells.flatMap((p, i) =>
-        p ? [{ id: p.id, color: p.color, r: Math.floor(i / state.cols), c: i % state.cols, scale: 1 }] : [],
+        p ? [{ id: p.id, piece: p, r: Math.floor(i / state.cols), c: i % state.cols, scale: 1, alpha: 1 }] : [],
       );
   for (const s of sprites) {
-    if (s.scale <= 0) continue;
+    if (s.scale <= 0 || s.alpha <= 0) continue;
     const [x, y] = toScreen(layout, s.r, s.c);
-    drawDot(ctx, x, y, radius * s.scale, s.color, opts);
+    ctx.globalAlpha = s.alpha;
+    drawPiece(ctx, s.piece, x, y, radius * s.scale, opts);
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
 
@@ -107,7 +109,7 @@ export function drawScene(
     ctx.strokeStyle = withAlpha(config.ink[theme], 0.5 * (1 - b.progress));
     ctx.lineWidth = cell * 0.08;
     ctx.beginPath();
-    ctx.arc(x, y, radius + cell * (config.bomb.radius + 0.2) * b.progress, 0, Math.PI * 2);
+    ctx.arc(x, y, radius + cell * (state.bombRadius + 0.2) * b.progress, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -149,6 +151,34 @@ function drawTerrain(ctx: CanvasRenderingContext2D, layout: Layout, s: GameState
     }
   }
   ctx.stroke();
+}
+
+export function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number, y: number, r: number, opts: DrawOptions) {
+  switch (piece.kind) {
+    case 'dot':
+      return drawDot(ctx, x, y, r, piece.color, opts);
+    case 'anchor':
+      return drawAnchor(ctx, x, y, r, config.ink[opts.theme]);
+  }
+}
+
+/** An anchor: ring, shank, stock, and curved arms. Drawn in ink so it never reads as a dot color. */
+function drawAnchor(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, ink: string) {
+  const s = r * config.anchor.scale;
+  ctx.save();
+  ctx.strokeStyle = ink;
+  ctx.lineWidth = s * 0.24;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.arc(x, y - s * 0.78, s * 0.22, 0, Math.PI * 2);
+  ctx.moveTo(x, y - s * 0.56);
+  ctx.lineTo(x, y + s * 0.9);
+  ctx.moveTo(x - s * 0.42, y - s * 0.28);
+  ctx.lineTo(x + s * 0.42, y - s * 0.28);
+  ctx.moveTo(x + s * 0.8 * Math.cos(0.12 * Math.PI), y + s * 0.1 + s * 0.8 * Math.sin(0.12 * Math.PI));
+  ctx.arc(x, y + s * 0.1, s * 0.8, 0.12 * Math.PI, 0.88 * Math.PI);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawDot(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, opts: DrawOptions) {

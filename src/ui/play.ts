@@ -8,7 +8,7 @@ import {
   addMoves, applyMove, extendPath, goalDone, goalRemaining, isLoopClosed, isValidPath, movesLeft,
   type GameState,
 } from '../rules';
-import { currentTheme, dotIcon, el } from './dom';
+import { currentTheme, el, goalIcon } from './dom';
 
 export interface PlayHooks {
   /** Called once the final move's animation has finished. */
@@ -72,7 +72,7 @@ export class PlayScreen {
     this.hud.goals.replaceChildren(
       ...s.goals.map((g) =>
         el('div', { class: `goal${goalDone(s, g) ? ' done' : ''}` },
-          dotIcon(g.goal.color, cb),
+          goalIcon(g.goal, cb),
           el('span', {}, goalDone(s, g) ? '✓' : String(goalRemaining(s, g))),
         ),
       ),
@@ -105,7 +105,11 @@ export class PlayScreen {
     if (cell === null) return;
     const path = extendPath(this.state, [], cell);
     if (path.length === 0) return;
-    this.canvas.setPointerCapture(e.pointerId);
+    try {
+      this.canvas.setPointerCapture(e.pointerId);
+    } catch {
+      // Capture is a nicety (keeps the drag if the finger leaves the canvas); input works without it.
+    }
     this.drag = { path, finger: pt, addedAt: performance.now(), loop: false, pointerId: e.pointerId, last: pt };
     this.redraw();
   }

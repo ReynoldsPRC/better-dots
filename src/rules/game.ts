@@ -1,16 +1,20 @@
 // Game state transitions: setup, moves, gravity, refill, reshuffle, goals.
-// Every function here is pure: it returns new state and never mutates input.
+// Every exported function is pure: it returns new state and never mutates input.
 import { config } from '../config';
 import { canCross, cellsAround, toIndex } from './board';
-import { enclosedCells, isLoopClosed, isValidPath } from './path';
+import { connectableColor, enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
-import type { ClearStep, ColorId, GameState, GoalState, LevelDef, MoveResult, Piece } from './types';
+import type {
+  BlastType, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, LevelDef, MoveEvent, MoveResult, Piece, Tally,
+} from './types';
 
 export interface GameOptions {
   /** Seed for refills and reshuffles. Defaults to continuing from the level seed. */
   playSeed?: number;
   bombRadius?: number;
 }
+
+// --- setup -------------------------------------------------------------------
 
 /**
  * Builds the starting board. The layout comes from the level seed, so a level
@@ -20,7 +24,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
   const rows = level.layout.length;
   const cols = Math.max(...level.layout.map((row) => row.length));
   const playable: boolean[] = [];
-  const cells: (Piece | null)[] = [];
+  const cells: Cells = [];
   let nextId = 1;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -40,6 +44,12 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     }
   }
 
+  for (const p of level.pieces ?? []) {
+    const i = p.r * cols + p.c;
+    if (!playable[i]) throw new Error(`level ${level.id}: piece at row ${p.r}, col ${p.c} is not on a cell`);
+    cells[i] = { kind: 'anchor', id: nextId++ };
+  }
+
   const { wallRight, wallDown } = placeWalls(level, rows, cols);
 
   const boardRng = new Rng(seedRng(level.seed));
@@ -47,6 +57,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     if (playable[i] && cells[i] === null) cells[i] = { kind: 'dot', id: nextId++, color: boardRng.pick(level.colors) };
   }
 
+  const startAnchors = cells.filter((p) => p?.kind === 'anchor').length;
   const state: GameState = {
     rows,
     cols,
@@ -64,6 +75,8 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     goals: level.goals.map((goal) => ({ goal: { ...goal }, progress: 0 })),
     status: 'playing',
     bombRadius: opts.bombRadius ?? config.bomb.radius,
+    anchorDrops: level.anchorDrops ?? 0,
+    anchorTarget: Math.max(1, startAnchors),
   };
   state.cells = reshuffleUntilPlayable(state, state.cells, boardRng);
   state.rng = opts.playSeed === undefined ? boardRng.state : seedRng(opts.playSeed);
@@ -87,6 +100,8 @@ function placeWalls(level: LevelDef, rows: number, cols: number) {
   return { wallRight, wallDown };
 }
 
+// --- queries -----------------------------------------------------------------
+
 export function movesLeft(s: GameState): number {
   return s.moveLimit + s.extraMoves - s.movesUsed;
 }
@@ -100,20 +115,24 @@ export function goalDone(s: GameState, g: GoalState): boolean {
   return goalRemaining(s, g) === 0;
 }
 
-/** True if any two adjacent dots share a color. */
-export function hasMove(s: GameState, cells: readonly (Piece | null)[] = s.cells): boolean {
+/** True if any two adjacent cells could start a line. */
+export function hasMove(s: GameState, cells: Cells = s.cells): boolean {
+  const view = cells === s.cells ? s : { ...s, cells };
   for (let r = 0; r < s.rows; r++) {
     for (let c = 0; c < s.cols; c++) {
       const i = toIndex(s, r, c);
-      const a = cells[i];
-      if (!a || a.kind !== 'dot') continue;
+      const a = connectableColor(view, i);
+      if (a === null) continue;
       for (const j of [c + 1 < s.cols ? i + 1 : -1, r + 1 < s.rows ? i + s.cols : -1]) {
-        if (j < 0 || !canCross(s, i, j)) continue;
-        const b = cells[j];
-        if (b && b.kind === 'dot' && b.color === a.color) return true;
+        if (j >= 0 && canCross(s, i, j) && connectableColor(view, j) === a) return true;
       }
     }
   }
+  return false;
+}
+
+/** Cells that never move: their pieces stay put and gravity stops at them. */
+function isFixed(_s: GameState, _i: number): boolean {
   return false;
 }
 
@@ -121,9 +140,9 @@ export function hasMove(s: GameState, cells: readonly (Piece | null)[] = s.cells
  * Moves the regular dots around until a legal move exists. Other pieces stay
  * put. If shuffling alone can't do it, recolors one dot to match a neighbor.
  */
-function reshuffleUntilPlayable(s: GameState, cells: (Piece | null)[], rng: Rng): (Piece | null)[] {
+function reshuffleUntilPlayable(s: GameState, cells: Cells, rng: Rng): Cells {
   if (hasMove(s, cells)) return cells;
-  const spots = cells.flatMap((p, i) => (p && p.kind === 'dot' ? [i] : []));
+  const spots = cells.flatMap((p, i) => (p?.kind === 'dot' && !isFixed(s, i) ? [i] : []));
   let out = cells;
   for (let attempt = 0; attempt < 100; attempt++) {
     out = cells.slice();
@@ -134,36 +153,168 @@ function reshuffleUntilPlayable(s: GameState, cells: (Piece | null)[], rng: Rng)
   for (const a of spots) {
     const b = spots.find((j) => canCross(s, a, j));
     if (b !== undefined) {
-      out[b] = { ...(out[b] as Piece), color: (out[a] as Piece).color };
+      const color = (out[a] as Extract<Piece, { kind: 'dot' }>).color;
+      out[b] = { ...(out[b] as Extract<Piece, { kind: 'dot' }>), color };
       return out;
     }
   }
   return out;
 }
 
-/** Dots fall to the lowest open cells of their column; new dots fill from the top. */
-function settle(s: GameState, cells: (Piece | null)[], rng: Rng, nextId: number) {
-  const out = cells.slice();
-  const spawned: number[] = [];
-  for (let c = 0; c < s.cols; c++) {
-    const slots: number[] = [];
-    for (let r = 0; r < s.rows; r++) {
-      const i = toIndex(s, r, c);
-      if (s.playable[i]) slots.push(i);
-    }
-    const pieces = slots.map((i) => out[i]).filter((p): p is Piece => p !== null);
-    const empty = slots.length - pieces.length;
-    slots.forEach((i, k) => {
-      if (k < empty) {
-        const id = nextId++;
-        spawned.push(id);
-        out[i] = { kind: 'dot', id, color: rng.pick(s.colors) };
-      } else {
-        out[i] = pieces[k - empty];
-      }
-    });
+// --- one move ------------------------------------------------------------------
+
+/** Mutable scratch space for resolving one move. */
+class Move {
+  readonly cells: Cells;
+  readonly rng: Rng;
+  nextId: number;
+  anchorDrops: number;
+  readonly events: MoveEvent[] = [];
+  readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0 };
+
+  constructor(readonly s: GameState) {
+    this.cells = s.cells.slice();
+    this.rng = new Rng(s.rng);
+    this.nextId = s.nextId;
+    this.anchorDrops = s.anchorDrops;
   }
-  return { cells: out, spawned, nextId };
+
+  /** The board as it stands mid-move, for rule queries. */
+  view(): GameState {
+    return { ...this.s, cells: this.cells };
+  }
+
+  emit(e: DistributiveOmit<MoveEvent, 'board'>): void {
+    this.events.push({ ...e, board: this.cells.slice() } as MoveEvent);
+  }
+
+  /** Clears one cell. Returns true if a piece was removed. Anchors only leave by sinking. */
+  clear(i: number): boolean {
+    const p = this.cells[i];
+    if (!p || p.kind === 'anchor') return false;
+    this.cells[i] = null;
+    this.tally.collected[p.color]++;
+    return true;
+  }
+
+  stage(kind: ClearKind, cells: Iterable<number>, sources: ClearStep['sources'] = []): void {
+    const removed = [...new Set(cells)].sort((a, b) => a - b).filter((i) => this.clear(i));
+    this.emit({ kind: 'clear', step: { kind, cells: removed, sources } });
+  }
+
+  /** Line or loop, then any chain of blasts it sets off. */
+  cascade(path: readonly number[], color: ColorId, loop: boolean): void {
+    const s = this.s;
+    const view = this.view();
+    const first = loop ? this.cells.flatMap((_, i) => (connectableColor(view, i) === color ? [i] : [])) : path;
+    // Dots enclosed by a loop that aren't its color become bombs.
+    const bombs = loop ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && !first.includes(i)) : [];
+    this.stage(loop ? 'loop' : 'line', first);
+
+    let sources: { cell: number; type: BlastType }[] = bombs.map((cell) => ({ cell, type: 'bomb' }));
+    while (sources.length > 0) {
+      const hit = new Set<number>();
+      for (const src of sources) {
+        hit.add(src.cell);
+        for (const j of cellsAround(s, src.cell, s.bombRadius)) hit.add(j);
+      }
+      this.stage('blast', hit, sources);
+      sources = [];
+    }
+  }
+
+  /** Lowest cell of a column, where anchors sink. */
+  private bottomOf(c: number): number {
+    for (let r = this.s.rows - 1; r >= 0; r--) if (this.s.playable[r * this.s.cols + c]) return r * this.s.cols + c;
+    return -1;
+  }
+
+  /**
+   * Gravity and refill. Each column splits into runs between fixed cells;
+   * pieces fall to the bottom of their run, and empty tops refill. New pieces
+   * in the top run come from above the board; lower runs refill from under
+   * the fixed cell above them.
+   */
+  fall(): void {
+    const { s, cells, rng } = this;
+    const slots: { i: number; startRow: number; top: boolean }[] = [];
+    for (let c = 0; c < s.cols; c++) {
+      let run: number[] = [];
+      let boundary = -1;
+      const flush = () => {
+        const pieces = run.map((i) => cells[i]).filter((p): p is Piece => p !== null);
+        const empty = run.length - pieces.length;
+        const lowestNew = empty > 0 ? Math.floor(run[empty - 1] / s.cols) : 0;
+        run.forEach((i, k) => {
+          if (k < empty) {
+            cells[i] = null;
+            slots.push({ i, startRow: Math.floor(i / s.cols) - (lowestNew - boundary), top: boundary === -1 });
+          } else {
+            cells[i] = pieces[k - empty];
+          }
+        });
+        run = [];
+      };
+      for (let r = 0; r < s.rows; r++) {
+        const i = r * s.cols + c;
+        if (!s.playable[i]) continue;
+        if (isFixed(s, i)) {
+          flush();
+          boundary = r;
+        } else {
+          run.push(i);
+        }
+      }
+      flush();
+    }
+
+    // At most one anchor drops in per fall, at the top of a seeded column.
+    let anchorSlot = -1;
+    const onBoard = cells.filter((p) => p?.kind === 'anchor').length;
+    if (this.anchorDrops > 0 && onBoard < s.anchorTarget) {
+      const tops = slots.filter((x, k) => x.top && (k === 0 || slots[k - 1].i % s.cols !== x.i % s.cols));
+      if (tops.length > 0) anchorSlot = tops[rng.int(tops.length)].i;
+    }
+    const spawnFrom: Record<number, number> = {};
+    for (const slot of slots) {
+      const id = this.nextId++;
+      if (slot.i === anchorSlot) {
+        cells[slot.i] = { kind: 'anchor', id };
+        this.anchorDrops--;
+      } else {
+        cells[slot.i] = { kind: 'dot', id, color: rng.pick(s.colors) };
+      }
+      spawnFrom[id] = slot.startRow;
+    }
+    this.emit({ kind: 'fall', spawnFrom });
+  }
+
+  /** Falls, sinks anchors that reached the bottom, and repeats until nothing sinks. */
+  settle(): void {
+    for (let pass = 0; pass < 50; pass++) {
+      this.fall();
+      const sunk: number[] = [];
+      for (let c = 0; c < this.s.cols; c++) {
+        const b = this.bottomOf(c);
+        if (b >= 0 && this.cells[b]?.kind === 'anchor') sunk.push(b);
+      }
+      if (sunk.length === 0) return;
+      for (const i of sunk) this.cells[i] = null;
+      this.tally.anchors += sunk.length;
+      this.emit({ kind: 'sink', cells: sunk });
+    }
+  }
+}
+
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+function progressFor(g: GoalState, t: Tally): number {
+  switch (g.goal.type) {
+    case 'collect':
+      return t.collected[g.goal.color];
+    case 'anchors':
+      return t.anchors;
+  }
 }
 
 /** Plays one move. Throws if the game is over or the path isn't legal. */
@@ -171,59 +322,48 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   if (s.status !== 'playing') throw new Error(`applyMove: game is ${s.status}`);
   if (!isValidPath(s, path)) throw new Error(`applyMove: invalid path ${JSON.stringify(path)}`);
 
-  const cells = s.cells.slice();
-  const color = (cells[path[0]] as Piece).color;
+  const color = connectableColor(s, path[0])!;
   const loop = isLoopClosed(path);
-  const collected = [0, 0, 0, 0, 0];
-  const steps: ClearStep[] = [];
-  const clear = (i: number) => {
-    const p = cells[i];
-    if (!p) return;
-    cells[i] = null;
-    if (p.kind === 'dot') collected[p.color]++;
-  };
+  const m = new Move(s);
+  m.cascade(path, color, loop);
+  m.settle();
+  const settled = m.cells.slice();
 
-  // Stage 1: the line, or for a loop every dot of its color.
-  const first = loop
-    ? cells.flatMap((p, i) => (p && p.kind === 'dot' && p.color === color ? [i] : []))
-    : [...new Set(path)].sort((a, b) => a - b);
-  // Pieces enclosed by a loop that aren't its color become bombs.
-  const bombs = loop ? enclosedCells(s, path).filter((i) => cells[i] && !first.includes(i)) : [];
-  first.forEach(clear);
-  steps.push({ kind: loop ? 'loop' : 'line', cells: first, sources: [] });
-
-  // Stage 2: bombs explode together, clearing themselves and their surroundings.
-  if (bombs.length > 0) {
-    const hit = new Set<number>(bombs);
-    for (const b of bombs) for (const j of cellsAround(s, b, s.bombRadius)) if (cells[j]) hit.add(j);
-    const blast = [...hit].sort((a, b) => a - b);
-    blast.forEach(clear);
-    steps.push({ kind: 'bomb', cells: blast, sources: bombs });
-  }
-
-  const rng = new Rng(s.rng);
-  const settled = settle(s, cells, rng, s.nextId);
-  const goals = s.goals.map((g) => ({ goal: g.goal, progress: g.progress + collected[g.goal.color] }));
   const next: GameState = {
     ...s,
-    cells: settled.cells,
-    nextId: settled.nextId,
+    cells: m.cells,
+    nextId: m.nextId,
+    anchorDrops: m.anchorDrops,
     movesUsed: s.movesUsed + 1,
-    goals,
+    goals: s.goals.map((g) => ({ goal: g.goal, progress: g.progress + progressFor(g, m.tally) })),
   };
-  if (goals.length > 0 && goals.every((g) => goalDone(next, g))) next.status = 'won';
+  if (next.goals.length > 0 && next.goals.every((g) => goalDone(next, g))) next.status = 'won';
   else if (movesLeft(next) <= 0) next.status = 'lost';
 
   let shuffled = false;
   if (next.status === 'playing' && !hasMove(next)) {
-    next.cells = reshuffleUntilPlayable(next, next.cells, rng);
+    const board = reshuffleUntilPlayable(next, next.cells, m.rng);
+    m.cells.splice(0, m.cells.length, ...board);
+    next.cells = m.cells;
+    m.emit({ kind: 'shuffle' });
     shuffled = true;
   }
-  next.rng = rng.state;
+  next.rng = m.rng.state;
 
+  const spawned: number[] = [];
+  for (const e of m.events) if (e.kind === 'fall') spawned.push(...Object.keys(e.spawnFrom).map(Number));
   return {
     state: next,
-    result: { path: path.slice(), color, loop, steps, settled: settled.cells, spawned: settled.spawned, shuffled },
+    result: {
+      path: path.slice(),
+      color,
+      loop,
+      events: m.events,
+      steps: m.events.flatMap((e) => (e.kind === 'clear' ? [e.step] : [])),
+      settled,
+      spawned,
+      shuffled,
+    },
   };
 }
 

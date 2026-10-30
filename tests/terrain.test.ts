@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   applyMove, createGame, extendPath, hasMove, isValidPath, parseLevel, type LevelDef, type Wall,
 } from '../src/rules';
-import { at, cells, colors, game } from './helpers';
+import { at, cells, colorOf, colors, game } from './helpers';
 
 const withWalls = (layout: string[], walls: Wall[], extra: Partial<LevelDef> = {}) => game(layout, { walls, ...extra });
 
@@ -76,7 +76,7 @@ describe('shaped boards', () => {
       st = applyMove(st, cells(st, [2, 0], [2, 1], [2, 2])).state;
       expect(st.cells[at(st, 0, 1)]).toBeNull();
       expect(st.cells[at(st, 1, 1)]).toBeNull();
-      if (st.cells[at(st, 2, 0)]!.color !== st.cells[at(st, 2, 1)]!.color) break;
+      if (colorOf(st.cells[at(st, 2, 0)]) !== colorOf(st.cells[at(st, 2, 1)])) break;
     }
   });
 

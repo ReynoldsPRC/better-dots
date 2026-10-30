@@ -1,0 +1,31 @@
+{
+  "seed": 624897,
+  "moves": 21,
+  "colors": [0, 1, 3, 4],
+  "layout": [
+    ".......",
+    ".......",
+    "...-...",
+    ".......",
+    "-.....-",
+    ".......",
+    "......."
+  ],
+  "walls": [
+    { "r": 2, "c": 2, "side": "down" },
+    { "r": 2, "c": 4, "side": "down" },
+    { "r": 4, "c": 3, "side": "right" },
+    { "r": 4, "c": 2, "side": "right" }
+  ],
+  "pieces": [
+    { "r": 2, "c": 1, "type": "anchor" },
+    { "r": 1, "c": 4, "type": "anchor" }
+  ],
+  "anchorDrops": 1,
+  "goals": [
+    { "type": "anchors", "count": 3 },
+    { "type": "collect", "color": 0, "count": 8 }
+  ],
+  "stars": { "two": 13, "three": 9 },
+  "bot": { "runs": 100, "winRate": 0.76, "median": 14, "p10": 9 }
+}

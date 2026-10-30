@@ -1,8 +1,8 @@
 // Small DOM helpers for the menus and HUD (the board itself is canvas).
 import { config } from '../config';
-import { drawSymbol } from '../render/board';
+import { drawPiece, drawSymbol } from '../render/board';
 import type { Theme } from '../render/canvas';
-import type { ColorId } from '../rules';
+import type { ColorId, Goal } from '../rules';
 
 type Child = Node | string | null | undefined | false;
 
@@ -44,5 +44,23 @@ export function dotIcon(color: ColorId, colorblind: boolean, size = 22): HTMLCan
   ctx.arc(r, r, r, 0, Math.PI * 2);
   ctx.fill();
   if (colorblind) drawSymbol(ctx, r, r, r * config.colorblind.symbolScale, color, config.background[theme]);
+  return canvas;
+}
+
+/** The HUD icon for a goal, drawn with the same code as the board. */
+export function goalIcon(goal: Goal, colorblind: boolean, size = 22): HTMLCanvasElement {
+  if (goal.type === 'collect') return dotIcon(goal.color, colorblind, size);
+  const theme = currentTheme();
+  const dpr = window.devicePixelRatio || 1;
+  const canvas = el('canvas', { class: 'dot-icon', width: String(size * dpr), height: String(size * dpr) });
+  canvas.style.width = canvas.style.height = `${size}px`;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(dpr, dpr);
+  const r = size / 2;
+  switch (goal.type) {
+    case 'anchors':
+      drawPiece(ctx, { kind: 'anchor', id: 0 }, r, r, r * 0.78, { theme, colorblind });
+      break;
+  }
   return canvas;
 }

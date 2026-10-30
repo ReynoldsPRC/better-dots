@@ -1,0 +1,23 @@
+{
+  "name": "Drop the anchor",
+  "seed": 4001,
+  "moves": 9,
+  "colors": [0, 1, 2],
+  "layout": [
+    "......",
+    "......",
+    "......",
+    "......",
+    "......",
+    "......"
+  ],
+  "pieces": [
+    { "r": 0, "c": 2, "type": "anchor" },
+    { "r": 0, "c": 3, "type": "anchor" }
+  ],
+  "goals": [
+    { "type": "anchors", "count": 2 }
+  ],
+  "stars": { "two": 6, "three": 6 },
+  "bot": { "runs": 100, "winRate": 0.81, "median": 7, "p10": 6 }
+}

@@ -2,6 +2,7 @@
 //   list                          bot stats for every level
 //   score [world ...] [--runs N]  re-run the bot; set moves, stars, and bot notes in each file
 //   generate <world> <count>      make candidates into levels/candidates/world-N/
+//                                 [--seed S] [--ramp a,b] (a..b within the preset's easy 0 to hard 1)
 //   keep <world> <n ...>          move candidates n... to the end of world N
 //   drop <world> <n ...>          remove levels n... from world N (renumbers the rest)
 //   reject <world> <n ...>        delete candidates n... (renumbers the rest)
@@ -50,6 +51,9 @@ const flag = (name: string, dflt: number) => {
 };
 const runs = flag('runs', 100);
 const seedFlag = flag('seed', Date.now() % 1_000_000);
+// --ramp a,b: where in the preset's easy..hard range this batch runs (default 0,1).
+const rampAt = args.indexOf('--ramp');
+const ramp = rampAt >= 0 ? args.splice(rampAt, 2)[1].split(',').map(Number) : [0, 1];
 const [cmd, ...rest] = args;
 const nums = rest.map(Number);
 
@@ -88,16 +92,16 @@ switch (cmd) {
     mkdirSync(candDir(w), { recursive: true });
     let n = levelFiles(candDir(w)).length;
     let seed = seedFlag;
-    for (let k = 0; k < count; seed++) {
-      const t = count === 1 ? 0.5 : k / (count - 1);
+    for (let k = 0, tries = 0; k < count && tries < count * 10; seed++, tries++) {
+      const t = ramp[0] + (ramp[1] - ramp[0]) * (count === 1 ? 0.5 : k / (count - 1));
       const c = generateCandidate({ ...preset(t), runs: Math.max(20, Math.round(runs / 2)) }, seed);
       if (!c) {
-        console.log(`seed ${seed}: discarded (bot couldn't fit the target)`);
         continue;
       }
       k++;
       n++;
       writeFileSync(join(candDir(w), `${pad(n)}.json`), formatLevelJson(toLevelFile(c.level, c.bot)));
+      tries = 0;
       console.log(`candidate c${w}-${n}: moves ${c.level.moves}, bot win ${c.bot.winRate}, median ${c.bot.median}`);
     }
     break;

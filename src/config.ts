@@ -66,6 +66,13 @@ export const config = {
     minMs: 90,
   },
 
+  anchor: {
+    /** Anchor glyph size as a multiple of dot radius. */
+    scale: 1.25,
+    /** Time to sink out of the bottom of the board. */
+    sinkMs: 320,
+  },
+
   shuffle: {
     /** Pause before an automatic reshuffle, then how long dots take to swap places. */
     delayMs: 250,

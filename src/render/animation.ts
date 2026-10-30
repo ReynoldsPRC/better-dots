@@ -1,15 +1,17 @@
-// Turns one move's result into a timeline: clear stages pop in sequence,
-// then everything falls, then (if the board was stuck) dots swap places.
+// Replays a move's events as a timeline: clear stages pop in sequence, then
+// falls, sinks, and (if the board was stuck) a reshuffle. Each event lasts a
+// set time; the board snapshot each event carries says where pieces end up.
 import { config } from '../config';
-import type { ClearKind, ColorId, GameState, MoveResult, Piece } from '../rules';
+import type { BlastType, Cells, ColorId, GameState, MoveEvent, MoveResult, Piece } from '../rules';
 import { ease } from './easing';
 
 export interface SpriteFrame {
   id: number;
-  color: ColorId;
+  piece: Piece;
   r: number;
   c: number;
   scale: number;
+  alpha: number;
 }
 
 export interface Frame {
@@ -17,153 +19,159 @@ export interface Frame {
   /** Board-wide loop pulse. */
   pulse: { color: ColorId; alpha: number } | null;
   /** Expanding rings where bombs go off; progress runs 0..1. */
-  blasts: { r: number; c: number; progress: number }[];
+  blasts: { r: number; c: number; type: BlastType; progress: number }[];
   done: boolean;
 }
 
-interface Sprite {
-  id: number;
-  color: ColorId;
-  from: [number, number];
-  mid: [number, number] | null;
-  to: [number, number] | null;
-  popAt: number | null;
-  fallMs: number;
+interface Segment {
+  start: number;
+  dur: number;
+  event: MoveEvent;
+  before: Cells;
+  /** Per piece id: fall duration (fall events only). */
+  fallMs?: Map<number, number>;
+}
+
+type Pos = [number, number];
+
+function positions(cells: Cells, cols: number): Map<number, Pos> {
+  const m = new Map<number, Pos>();
+  cells.forEach((p, i) => p && m.set(p.id, [Math.floor(i / cols), i % cols]));
+  return m;
 }
 
 export class MoveAnimation {
-  private readonly sprites: Sprite[] = [];
-  private readonly stages: { at: number; kind: ClearKind; color: ColorId; sources: [number, number][] }[] = [];
-  private readonly fallStart: number;
-  private readonly shuffleStart: number | null;
+  private readonly segments: Segment[] = [];
+  private readonly cols: number;
+  private readonly color: ColorId;
   readonly end: number;
 
-  constructor(prev: GameState, result: MoveResult, next: GameState, readonly start: number) {
-    const rc = (i: number): [number, number] => [Math.floor(i / prev.cols), i % prev.cols];
-    const { stepMs } = config.cascade;
-    const { popMs, loopPulseMs } = config.clear;
-
-    const popAt = new Map<number, number>();
-    let clearEnd = 0;
-    result.steps.forEach((step, k) => {
-      const at = k * stepMs;
-      for (const i of step.cells) {
-        const p = prev.cells[i];
-        if (p) popAt.set(p.id, at);
-      }
-      this.stages.push({ at, kind: step.kind, color: result.color, sources: step.sources.map(rc) });
-      const tail = step.kind === 'bomb' ? config.bomb.explodeMs : step.kind === 'loop' ? loopPulseMs : popMs;
-      clearEnd = Math.max(clearEnd, at + Math.max(popMs, tail));
-    });
-    this.fallStart = clearEnd;
-
-    const where = (cells: readonly (Piece | null)[]) => {
-      const m = new Map<number, number>();
-      cells.forEach((p, i) => p && m.set(p.id, i));
-      return m;
-    };
-    const midAt = where(result.settled);
-    const endAt = where(next.cells);
-
-    // New dots start stacked just above the board, keeping their spacing.
-    const spawnOffset = new Map<number, number>();
-    const spawned = new Set(result.spawned);
-    for (let c = 0; c < prev.cols; c++) {
-      let lowest = -1;
-      for (let r = 0; r < prev.rows; r++) {
-        const p = result.settled[r * prev.cols + c];
-        if (p && spawned.has(p.id)) lowest = r;
-      }
-      spawnOffset.set(c, lowest + 1);
-    }
-
+  constructor(prev: GameState, result: MoveResult, _next: GameState, readonly start: number) {
+    this.cols = prev.cols;
+    this.color = result.color;
+    const { popMs } = config.clear;
     const { speed, minMs, settleMs } = config.fall;
-    let fallEnd = this.fallStart;
-    const fallMs = (from: number, to: number) => {
-      const d = to - from;
-      return d <= 0 ? 0 : Math.max(minMs, (1000 * d) / speed);
-    };
-
-    prev.cells.forEach((p, i) => {
-      if (!p) return;
-      const mi = midAt.get(p.id);
-      const from = rc(i);
-      const mid = mi === undefined ? null : rc(mi);
-      const ms = mid ? fallMs(from[0], mid[0]) : 0;
-      if (ms > 0) fallEnd = Math.max(fallEnd, this.fallStart + ms + settleMs);
-      this.sprites.push({ id: p.id, color: p.color, from, mid, to: mid && rcOrNull(endAt.get(p.id)), popAt: popAt.get(p.id) ?? null, fallMs: ms });
-    });
-    for (const id of result.spawned) {
-      const mi = midAt.get(id)!;
-      const p = result.settled[mi]!;
-      const mid = rc(mi);
-      const from: [number, number] = [mid[0] - spawnOffset.get(mid[1])!, mid[1]];
-      const ms = fallMs(from[0], mid[0]);
-      fallEnd = Math.max(fallEnd, this.fallStart + ms + settleMs);
-      this.sprites.push({ id, color: p.color, from, mid, to: rcOrNull(endAt.get(id)), popAt: null, fallMs: ms });
+    let t = 0;
+    let before = prev.cells;
+    for (const event of result.events) {
+      const seg: Segment = { start: t, dur: 0, event, before };
+      switch (event.kind) {
+        case 'clear':
+          seg.dur = Math.max(config.cascade.stepMs, popMs, event.step.kind === 'blast' ? config.bomb.explodeMs : 0);
+          break;
+        case 'fall': {
+          const from = positions(before, this.cols);
+          seg.fallMs = new Map();
+          let longest = 0;
+          event.board.forEach((p, i) => {
+            if (!p) return;
+            const toRow = Math.floor(i / this.cols);
+            const fromRow = from.get(p.id)?.[0] ?? event.spawnFrom[p.id] ?? toRow;
+            const d = toRow - fromRow;
+            const ms = d <= 0 ? 0 : Math.max(minMs, (1000 * d) / speed);
+            seg.fallMs!.set(p.id, ms);
+            longest = Math.max(longest, ms);
+          });
+          seg.dur = longest > 0 ? longest + settleMs : 0;
+          break;
+        }
+        case 'sink':
+          seg.dur = config.anchor.sinkMs;
+          break;
+        case 'shuffle':
+          seg.dur = config.shuffle.delayMs + config.shuffle.moveMs;
+          break;
+      }
+      this.segments.push(seg);
+      t += seg.dur;
+      before = event.board;
     }
-
-    function rcOrNull(i: number | undefined): [number, number] | null {
-      return i === undefined ? null : rc(i);
-    }
-
-    this.shuffleStart = result.shuffled ? fallEnd + config.shuffle.delayMs : null;
-    this.end = start + (this.shuffleStart === null ? fallEnd : this.shuffleStart + config.shuffle.moveMs);
+    this.end = start + t;
   }
 
   frame(now: number): Frame {
     const t = now - this.start;
-    const { popMs, loopPulseMs, loopPulseAlpha } = config.clear;
-    const { settleMs, settleBounce, easing } = config.fall;
-    const sprites: SpriteFrame[] = [];
-
-    for (const s of this.sprites) {
-      if (s.popAt !== null) {
-        if (t < s.popAt) {
-          sprites.push({ id: s.id, color: s.color, r: s.from[0], c: s.from[1], scale: 1 });
-        } else if (t < s.popAt + popMs) {
-          const p = (t - s.popAt) / popMs;
-          // A quick swell, then shrink away.
-          const scale = p < 0.25 ? 1 + 0.6 * p : (1.15 * (1 - p)) / 0.75;
-          sprites.push({ id: s.id, color: s.color, r: s.from[0], c: s.from[1], scale });
-        }
-        continue;
-      }
-      const mid = s.mid!;
-      let r = s.from[0];
-      let c = s.from[1];
-      const ft = t - this.fallStart;
-      if (ft >= 0) {
-        if (s.fallMs > 0 && ft < s.fallMs) {
-          r = s.from[0] + (mid[0] - s.from[0]) * ease(easing, ft / s.fallMs);
-        } else {
-          r = mid[0];
-          c = mid[1];
-          const st = ft - s.fallMs;
-          if (s.fallMs > 0 && st < settleMs) r -= settleBounce * Math.sin(Math.PI * (st / settleMs));
-        }
-      }
-      if (this.shuffleStart !== null && t >= this.shuffleStart && s.to) {
-        const p = ease('easeInOutQuad', (t - this.shuffleStart) / config.shuffle.moveMs);
-        r = mid[0] + (s.to[0] - mid[0]) * p;
-        c = mid[1] + (s.to[1] - mid[1]) * p;
-      }
-      sprites.push({ id: s.id, color: s.color, r, c, scale: 1 });
-    }
+    const done = now >= this.end;
+    const seg = this.segments.find((s) => t < s.start + s.dur) ?? null;
+    const sprites = seg && !done ? this.spritesFor(seg, t - seg.start) : this.still(this.segments.at(-1)?.event.board ?? []);
 
     let pulse: Frame['pulse'] = null;
     const blasts: Frame['blasts'] = [];
-    for (const st of this.stages) {
-      const lt = t - st.at;
+    for (const s of this.segments) {
+      if (s.event.kind !== 'clear') continue;
+      const lt = t - s.start;
       if (lt < 0) continue;
-      if (st.kind === 'loop' && lt < loopPulseMs) {
-        pulse = { color: st.color, alpha: loopPulseAlpha * (1 - lt / loopPulseMs) };
+      const step = s.event.step;
+      if (step.kind === 'loop' && lt < config.clear.loopPulseMs) {
+        pulse = { color: this.color, alpha: config.clear.loopPulseAlpha * (1 - lt / config.clear.loopPulseMs) };
       }
-      if (st.kind === 'bomb' && lt < config.bomb.explodeMs) {
-        for (const [r, c] of st.sources) blasts.push({ r, c, progress: lt / config.bomb.explodeMs });
+      if (step.kind === 'blast' && lt < config.bomb.explodeMs) {
+        for (const src of step.sources) {
+          blasts.push({ r: Math.floor(src.cell / this.cols), c: src.cell % this.cols, type: src.type, progress: lt / config.bomb.explodeMs });
+        }
       }
     }
+    return { sprites, pulse, blasts, done };
+  }
 
-    return { sprites, pulse, blasts, done: now >= this.end };
+  private still(cells: Cells): SpriteFrame[] {
+    return cells.flatMap((p, i) =>
+      p ? [{ id: p.id, piece: p, r: Math.floor(i / this.cols), c: i % this.cols, scale: 1, alpha: 1 }] : [],
+    );
+  }
+
+  private spritesFor(seg: Segment, lt: number): SpriteFrame[] {
+    const { event, before } = seg;
+    const cols = this.cols;
+    switch (event.kind) {
+      case 'clear': {
+        // Pieces gone after this stage pop; the rest stay put (and show their new state).
+        const after = positions(event.board, cols);
+        const p = Math.min(1, lt / config.clear.popMs);
+        const scale = p < 0.25 ? 1 + 0.6 * p : (1.15 * (1 - p)) / 0.75;
+        const out = this.still(event.board);
+        before.forEach((piece, i) => {
+          if (piece && !after.has(piece.id) && scale > 0) {
+            out.push({ id: piece.id, piece, r: Math.floor(i / cols), c: i % cols, scale, alpha: 1 });
+          }
+        });
+        return out;
+      }
+      case 'fall': {
+        const from = positions(before, cols);
+        const { settleMs, settleBounce, easing } = config.fall;
+        return event.board.flatMap((piece, i) => {
+          if (!piece) return [];
+          const toR = Math.floor(i / cols);
+          const c = i % cols;
+          const fromR = from.get(piece.id)?.[0] ?? event.spawnFrom[piece.id] ?? toR;
+          const ms = seg.fallMs!.get(piece.id) ?? 0;
+          let r = toR;
+          if (ms > 0 && lt < ms) r = fromR + (toR - fromR) * ease(easing, lt / ms);
+          else if (ms > 0 && lt - ms < settleMs) r = toR - settleBounce * Math.sin(Math.PI * ((lt - ms) / settleMs));
+          return [{ id: piece.id, piece, r, c, scale: 1, alpha: 1 }];
+        });
+      }
+      case 'sink': {
+        const p = ease('easeInQuad', lt / config.anchor.sinkMs);
+        const out = this.still(event.board);
+        for (const i of event.cells) {
+          const piece = before[i];
+          if (piece) out.push({ id: piece.id, piece, r: Math.floor(i / cols) + 0.6 * p, c: i % cols, scale: 1 - 0.3 * p, alpha: 1 - p });
+        }
+        return out;
+      }
+      case 'shuffle': {
+        const from = positions(before, cols);
+        const p = ease('easeInOutQuad', (lt - config.shuffle.delayMs) / config.shuffle.moveMs);
+        return event.board.flatMap((piece, i) => {
+          if (!piece) return [];
+          const [r0, c0] = from.get(piece.id) ?? [Math.floor(i / cols), i % cols];
+          const r1 = Math.floor(i / cols);
+          const c1 = i % cols;
+          return [{ id: piece.id, piece, r: r0 + (r1 - r0) * p, c: c0 + (c1 - c0) * p, scale: 1, alpha: 1 }];
+        });
+      }
+    }
   }
 }
