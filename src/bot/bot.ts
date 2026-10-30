@@ -1,21 +1,29 @@
-// The level-testing bot: randomized greedy. Each turn it lists a handful of
-// candidate moves (per same-color group: a loop if one exists, and the longest
-// line it finds), plays each one on a copy of the board, scores the result by
-// goal progress, and picks the best with a little noise.
+// The level-testing bot: randomized greedy with a short lookahead. Each turn it
+// lists a handful of candidate moves (per same-color group: the best few loops,
+// ranked by what they enclose, and the longest lines it finds), plays each one
+// on a copy of the board, and scores the result by goal progress plus a little
+// noise. The top few are then scored again with the best reply after them.
 // Pure and seeded like the rules, so runs are reproducible.
 import {
-  applyMove, canLink, connectableColor, createGame, goalRemaining, Rng, seedRng,
+  applyMove, canLink, cellsAround, connectableColor, createGame, enclosedCells, goalRemaining, Rng, seedRng,
   type GameState, type LevelDef,
 } from '../rules';
 
 export interface BotOptions {
-  /** Noise added to each candidate's score (0 = always the same choice). */
+  /**
+   * Noise added to each candidate's score, in units of one item of the largest
+   * goal (0 = always the same choice). Below 1, so it only breaks near-ties.
+   */
   noise?: number;
   /** Search budget per group when looking for long lines. */
   pathBudget?: number;
+  /** How many of the best one-move candidates get a second look with their best reply (0 = pure greedy). */
+  lookahead?: number;
+  /** Weight of the best reply's score in that second look. */
+  replyWeight?: number;
 }
 
-const DEFAULTS: Required<BotOptions> = { noise: 0.15, pathBudget: 400 };
+const DEFAULTS: Required<BotOptions> = { noise: 0.2, pathBudget: 400, lookahead: 3, replyWeight: 0.5 };
 
 /** Same-color groups of cells a line could run through. */
 function groups(s: GameState): number[][] {
@@ -51,8 +59,33 @@ function neighbors(s: GameState, i: number): number[] {
   return out;
 }
 
-/** A closed loop inside the group, if there is one. */
-function findLoop(s: GameState, group: number[]): number[] | null {
+/**
+ * Distinct closed loops inside the group (one per non-tree edge of a DFS),
+ * best first: by how many other-color dots and ladybugs they enclose (each a
+ * bomb), then by how many gems those bombs would reach. At most `max`.
+ */
+export function findLoops(s: GameState, group: number[], max = 4): number[][] {
+  const seen = new Set<string>();
+  const loops: { path: number[]; bombs: number; gems: number }[] = [];
+  for (const path of cycles(s, group)) {
+    const key = path.slice(0, -1).sort((a, b) => a - b).join(',');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const color = connectableColor(s, path[0]);
+    const bombs = enclosedCells(s, path).filter((i) => {
+      const p = s.cells[i];
+      return (p?.kind === 'dot' || p?.kind === 'ladybug') && p.color !== color && s.layers.ice[i] === 0;
+    });
+    const hit = new Set<number>();
+    for (const b of bombs) for (const j of cellsAround(s, b, s.bombRadius)) if (s.cells[j]?.kind === 'gem') hit.add(j);
+    loops.push({ path, bombs: bombs.length, gems: hit.size });
+  }
+  loops.sort((a, b) => b.bombs - a.bombs || b.gems - a.gems);
+  return loops.slice(0, max).map((l) => l.path);
+}
+
+/** Every cycle closed by a non-tree edge of a DFS over the group (paths start and end at the same cell). */
+function* cycles(s: GameState, group: number[]): Generator<number[]> {
   const inGroup = new Set(group);
   const parent = new Map<number, number>();
   const depth = new Map<number, number>();
@@ -86,12 +119,11 @@ function findLoop(s: GameState, group: number[]): number[] | null {
             }
           }
           const loop = [...fromA, x, ...fromB.reverse(), a];
-          if (loop.length >= 5) return loop;
+          if (loop.length >= 5) yield loop;
         }
       }
     }
   }
-  return null;
 }
 
 /**
@@ -145,12 +177,20 @@ function longestLine(s: GameState, group: number[], budget: number, from?: numbe
 
 export function candidateMoves(s: GameState, budget = DEFAULTS.pathBudget): number[][] {
   const out: number[][] = [];
+  // Lines over the same cells clear the same way; keep one of each.
+  const seen = new Set<string>();
+  const add = (path: number[]) => {
+    const key = path.slice().sort((a, b) => a - b).join(',');
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(path);
+    }
+  };
   const targets = targetCells(s);
   for (const g of groups(s)) {
-    const loop = g.length >= 4 ? findLoop(s, g) : null;
-    if (loop) out.push(loop);
-    out.push(g.length === 2 ? g : longestLine(s, g, budget));
-    if (g.length > 2) for (const t of g) if (targets.has(t)) out.push(longestLine(s, g, budget / 4, t));
+    if (g.length >= 4) findLoops(s, g).forEach(add);
+    add(g.length === 2 ? g : longestLine(s, g, budget));
+    if (g.length > 2) for (const t of g) if (targets.has(t)) add(longestLine(s, g, budget / 4, t));
   }
   return out;
 }
@@ -223,6 +263,38 @@ export interface RunResult {
   movesUsed: number;
 }
 
+/** Scores single moves from one board: goal progress plus small tie-breakers. */
+function scorer(s: GameState, startRemaining: number[]) {
+  const targets = targetCells(s);
+  const nearTarget = new Set<number>();
+  for (const t of targets) for (const n of neighbors(s, t)) if (!targets.has(n)) nearTarget.add(n);
+  return (path: number[]): { state: GameState; score: number } => {
+    const { state, result } = applyMove(s, path);
+    let cleared = 0;
+    let near = 0;
+    for (const st of result.steps) {
+      cleared += st.cells.length;
+      for (const i of st.cells) if (nearTarget.has(i)) near++;
+    }
+    const score =
+      (state.status === 'won' ? 100 : 0) +
+      progressScore(s, state, startRemaining) +
+      0.002 * cleared +
+      // Clearing next to a stuck target brings it new neighbors.
+      0.006 * near;
+    return { state, score };
+  };
+}
+
+/** The best score any one move from `s` reaches (no noise). */
+function bestReply(s: GameState, startRemaining: number[], budget: number): number {
+  if (s.status !== 'playing') return 0;
+  const score = scorer(s, startRemaining);
+  let best = -Infinity;
+  for (const path of candidateMoves(s, budget)) best = Math.max(best, score(path).score);
+  return Number.isFinite(best) ? best : 0;
+}
+
 /**
  * Plays one game. `moveCap` overrides the level's limit so the bot can report
  * how many moves it actually needed.
@@ -233,35 +305,27 @@ export function playOnce(level: LevelDef, playSeed: number, moveCap?: number, op
   let s = createGame(level, { playSeed });
   if (moveCap !== undefined) s = { ...s, moveLimit: moveCap };
   const startRemaining = s.goals.map((g) => goalRemaining(s, g));
+  // One item of the largest goal: the smallest unit of progress the score sees.
+  const unit = 1 / Math.max(1, ...startRemaining);
 
   while (s.status === 'playing') {
-    const moves = candidateMoves(s, o.pathBudget);
-    const targets = targetCells(s);
-    const nearTarget = new Set<number>();
-    for (const t of targets) for (const n of neighbors(s, t)) if (!targets.has(n)) nearTarget.add(n);
-    let best: GameState | null = null;
-    let bestScore = -Infinity;
-    for (const path of moves) {
-      const { state, result } = applyMove(s, path);
-      let cleared = 0;
-      let near = 0;
-      for (const st of result.steps) {
-        cleared += st.cells.length;
-        for (const i of st.cells) if (nearTarget.has(i)) near++;
-      }
-      const score =
-        (state.status === 'won' ? 100 : 0) +
-        progressScore(s, state, startRemaining) +
-        0.002 * cleared +
-        // Clearing next to a stuck target brings it new neighbors.
-        0.006 * near +
-        o.noise * rng.float() * 0.1;
-      if (score > bestScore) {
-        bestScore = score;
-        best = state;
+    const score = scorer(s, startRemaining);
+    const scored = candidateMoves(s, o.pathBudget).map((path) => {
+      const r = score(path);
+      return { state: r.state, score: r.score + o.noise * unit * rng.float() };
+    });
+    // Second look at the best few: add the best reply after each.
+    const top = scored.slice().sort((a, b) => b.score - a.score).slice(0, o.lookahead);
+    let best = scored.reduce((a, b) => (b.score > a.score ? b : a));
+    let bestTotal = -Infinity;
+    for (const c of top) {
+      const total = c.score + (c.state.status === 'won' ? 0 : o.replyWeight * bestReply(c.state, startRemaining, o.pathBudget / 2));
+      if (total > bestTotal) {
+        bestTotal = total;
+        best = c;
       }
     }
-    s = best!;
+    s = best.state;
   }
   return { won: s.status === 'won', movesUsed: s.movesUsed };
 }

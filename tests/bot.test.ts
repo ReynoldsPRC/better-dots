@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeLevel, candidateMoves, percentile, playOnce, tuneFromStats, type LevelStats } from '../src/bot/bot';
+import { analyzeLevel, candidateMoves, findLoops, percentile, playOnce, tuneFromStats, type LevelStats } from '../src/bot/bot';
 import { formatLevelJson, toLevelFile } from '../src/bot/format';
 import { generateCandidate } from '../src/bot/generate';
 import { candidates, catalog } from '../src/levels';
-import { createGame, isLoopClosed, isValidPath, parseLevel, type LevelDef } from '../src/rules';
+import { createGame, enclosedCells, isLoopClosed, isValidPath, parseLevel, type GameState, type LevelDef } from '../src/rules';
+import { at, game } from './helpers';
+
+const groupOf = (s: GameState, color: number) => s.cells.flatMap((p, i) => (p?.kind === 'dot' && p.color === color ? [i] : []));
 
 const easy: LevelDef = {
   id: 'easy', label: 'easy', seed: 3, moves: 30, colors: [0, 1, 2], layout: Array(6).fill('......'),
@@ -24,8 +27,32 @@ describe('bot', () => {
     for (const m of candidateMoves(s)) expect(isValidPath(s, m)).toBe(true);
   });
 
-  it('is reproducible for the same seed', () => {
+  it('is reproducible for the same seed, whatever the options', () => {
     expect(playOnce(easy, 9)).toEqual(playOnce(easy, 9));
+    const opts = { noise: 0.9, lookahead: 2, replyWeight: 0.8, pathBudget: 100 };
+    expect(playOnce(easy, 9, undefined, opts)).toEqual(playOnce(easy, 9, undefined, opts));
+    expect(analyzeLevel(easy, 5, 3, opts)).toEqual(analyzeLevel(easy, 5, 3, opts));
+  });
+
+  it('finds several distinct loops in a group', () => {
+    const s = game(['0000', '0000', '1212']);
+    const loops = findLoops(s, groupOf(s, 0));
+    expect(loops.length).toBeGreaterThanOrEqual(2);
+    for (const l of loops) {
+      expect(isLoopClosed(l)).toBe(true);
+      expect(isValidPath(s, l)).toBe(true);
+    }
+    const keys = loops.map((l) => l.slice(0, -1).sort((a, b) => a - b).join());
+    expect(new Set(keys).size).toBe(loops.length);
+  });
+
+  it('prefers the loop that encloses more other-color dots', () => {
+    // A ring around the 1 at (1,1), plus plain squares to its right.
+    const s = game(['00000', '01000', '00012', '12121']);
+    const loops = findLoops(s, groupOf(s, 0));
+    expect(loops.length).toBeGreaterThanOrEqual(2);
+    expect(enclosedCells(s, loops[0])).toContain(at(s, 1, 1));
+    expect(enclosedCells(s, loops[loops.length - 1])).toEqual([]);
   });
 
   it('wins an easy level and loses an impossible one', () => {
