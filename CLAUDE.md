@@ -38,7 +38,7 @@ Non-negotiable. Don't add any of these, even as an option:
 
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
 - `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` whose `events` list what happened in order (`clear` stages, `fall`, `sink`, `shuffle`, ...), each with the board after it. `src/render/animation.ts` replays that list, so a new mechanic adds an event kind and a way to draw it.
-- Gravity works per column in runs between fixed cells (frozen or burning cells). Pieces fall to the bottom of their run. The top run refills from above the board; in a run under a fixed cell, new dots appear in place (they grow in) since nothing can fall through.
+- Gravity works per column in runs between fixed cells (frozen or burning cells). Pieces fall to the bottom of their run. The top run refills from above the board. A run under a frozen cell doesn't refill at all: its pieces settle to the bottom and the gap under the ice stays empty until the ice breaks and the column falls again. In a run under a burning cell, new dots appear in place (they grow in) since nothing can fall through.
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
 - Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`) and `anchorDrops` (how many more anchors drop in). A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than the level started with (at least one), until drops run out. Anchor goals: `{ "type": "anchors", "count" }`.
 - Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
@@ -90,10 +90,11 @@ Each one is introduced in its own world (see Build order).
 
 ### Ice
 - Sits on a cell and locks that cell's dot in place. Frozen dots don't fall, dots above stack on them, and frozen dots can't be part of a connection.
+- The frozen dot plugs its column: when dots below it clear, the dots under it fall to fill the gaps, but nothing replaces them from above, so empty cells collect right under the ice. When the ice breaks, the freed dot and everything above it fall into the gap and the top of the column refills.
 - Broken from the edges: each move that clears at least one cell orthogonally adjacent to the ice removes one layer (default: one layer per move, no matter how many neighbors clear).
 - Thickness 1–3, each with a distinct look (fresh, cracked, nearly broken). Levels can place ice at any thickness.
 - When it breaks, the dot is freed, and anything under the ice (water, fire, slime) activates from that move on.
-- Ice protects its dot completely: a loop of that color leaves it, it doesn't become a bomb inside a loop, and blasts don't clear it. A blast reaching a frozen cell counts like a neighboring clear (one layer, still at most one per move). Neighbors are orthogonal; walls don't shield ice. Cells under ice refill from under it.
+- Ice protects its dot completely: a loop of that color leaves it, it doesn't become a bomb inside a loop, and blasts don't clear it. A blast reaching a frozen cell counts like a neighboring clear (one layer, still at most one per move). Neighbors are orthogonal; walls don't shield ice.
 - This is the player's preferred rule; the original may have worked differently. Revisit if it feels wrong in playtesting.
 
 ### Water

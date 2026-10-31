@@ -12,16 +12,38 @@ describe('ice', () => {
     expect(isValidPath(s, cells(s, [0, 0], [0, 1]))).toBe(false);
   });
 
-  it('frozen dots stay put; dots above stack on them; cells below refill from under the ice', () => {
-    const s = game(['2', '1', '0', '0', '0'], { ice: ['.', '.', '2', '.', '.'], colors: [0] });
+  it('frozen dots stay put; dots above stack on them; cells below are not replaced while it holds', () => {
+    const s = game(['21', '11', '02', '30', '31', '20'], { ice: ['..', '..', '2.', '..', '..', '..'], colors: [0, 1, 2, 3] });
     const frozen = s.cells[at(s, 2, 0)]!.id;
+    const bottom = s.cells[at(s, 5, 0)]!.id;
     const { state, result } = applyMove(s, cells(s, [3, 0], [4, 0]));
     expect(state.cells[at(s, 2, 0)]!.id).toBe(frozen);
     expect(state.cells[at(s, 1, 0)]!.id).toBe(s.cells[at(s, 1, 0)]!.id);
-    const fall = result.events.find((e) => e.kind === 'fall');
-    if (fall?.kind !== 'fall') throw new Error('no fall');
-    expect(Object.keys(fall.spawnFrom)).toHaveLength(2);
-    for (const row of Object.values(fall.spawnFrom)) expect(row).toBeGreaterThanOrEqual(1);
+    // The dot below stays at the bottom; the two cleared cells under the ice stay empty.
+    expect(state.cells[at(s, 5, 0)]!.id).toBe(bottom);
+    expect(state.cells[at(s, 3, 0)]).toBeNull();
+    expect(state.cells[at(s, 4, 0)]).toBeNull();
+    expect(result.spawned).toEqual([]);
+  });
+
+  it('dots below a frozen dot fall to fill gaps under it, leaving the gap at the top of their stretch', () => {
+    const s = game(['11', '00', '21', '30', '31'], { ice: ['..', '2.', '..', '..', '..'], colors: [0, 1, 2, 3] });
+    const two = s.cells[at(s, 2, 0)]!.id;
+    const { state } = applyMove(s, cells(s, [3, 0], [4, 0]));
+    expect(state.cells[at(s, 4, 0)]!.id).toBe(two);
+    expect(state.cells[at(s, 2, 0)]).toBeNull();
+    expect(state.cells[at(s, 3, 0)]).toBeNull();
+  });
+
+  it('once the ice breaks, the freed dot and everything above fall into the gap, and the top refills', () => {
+    const s = game(['10', '01', '33', '33'], { ice: ['..', '1.', '..', '..'], colors: [0, 1, 2, 3] });
+    // First move: clear below the ice (also next to it, so it breaks in the same move).
+    const frozen = s.cells[at(s, 1, 0)]!.id;
+    const { state } = applyMove(s, cells(s, [2, 0], [3, 0]));
+    expect(state.layers.ice[at(s, 1, 0)]).toBe(0);
+    // Broken this move, so the column falls this move: the freed dot lands at the bottom.
+    expect(state.cells[at(s, 3, 0)]!.id).toBe(frozen);
+    expect(state.cells.every((p) => p !== null)).toBe(true);
   });
 
   it('loses one layer per move when a neighboring cell clears, however many do', () => {

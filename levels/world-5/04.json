@@ -29,6 +29,6 @@
     { "type": "ice", "count": 13 },
     { "type": "collect", "color": 0, "count": 21 }
   ],
-  "stars": { "two": 14, "three": 11 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 15, "p10": 11 }
+  "stars": { "two": 14, "three": 9 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 15, "p10": 9 }
 }

@@ -1,7 +1,7 @@
 {
   "id": "fjf1xhym",
   "seed": 405773,
-  "moves": 16,
+  "moves": 15,
   "colors": [1, 2, 3, 4],
   "layout": [
     "......",
@@ -27,5 +27,5 @@
     { "type": "ice", "count": 12 }
   ],
   "stars": { "two": 11, "three": 9 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 12, "p10": 9 }
+  "bot": { "runs": 100, "winRate": 0.79, "median": 12, "p10": 9 }
 }

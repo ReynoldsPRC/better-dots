@@ -35,5 +35,5 @@
     { "type": "collect", "color": 4, "count": 12 }
   ],
   "stars": { "two": 10, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 11, "p10": 6 }
+  "bot": { "runs": 100, "winRate": 0.76, "median": 11, "p10": 6 }
 }

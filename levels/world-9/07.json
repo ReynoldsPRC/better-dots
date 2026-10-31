@@ -33,6 +33,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 12, "three": 8 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 13, "p10": 8 }
+  "stars": { "two": 12, "three": 9 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 13, "p10": 9 }
 }

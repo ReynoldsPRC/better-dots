@@ -34,5 +34,5 @@
     { "type": "flood" }
   ],
   "stars": { "two": 16, "three": 12 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 17, "p10": 12 }
+  "bot": { "runs": 100, "winRate": 0.8, "median": 17, "p10": 12 }
 }

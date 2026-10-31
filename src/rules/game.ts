@@ -472,8 +472,9 @@ class Move {
   /**
    * Gravity and refill. Each column splits into runs between fixed cells;
    * pieces fall to the bottom of their run, and empty tops refill. New pieces
-   * in the top run fall in from above the board; in lower runs (under a fixed
-   * cell) they appear in place.
+   * in the top run fall in from above the board. Under a frozen cell nothing
+   * refills: the gap waits until the ice breaks and the column can fall again.
+   * Under a burning cell new pieces appear in place.
    */
   fall(): void {
     const { cells, rng } = this;
@@ -482,6 +483,7 @@ class Move {
     for (let c = 0; c < s.cols; c++) {
       let run: number[] = [];
       let boundary = -1;
+      let underIce = false;
       const flush = () => {
         const pieces = run.map((i) => cells[i]).filter((p): p is Piece => p !== null);
         const empty = run.length - pieces.length;
@@ -489,6 +491,7 @@ class Move {
         run.forEach((i, k) => {
           if (k < empty) {
             cells[i] = null;
+            if (underIce) return;
             // From above the board in the top run; in place (they appear) under a fixed cell.
             const row = Math.floor(i / s.cols);
             slots.push({ i, startRow: boundary === -1 ? row - (lowestNew - boundary) : row, top: boundary === -1 });
@@ -504,6 +507,7 @@ class Move {
         if (isFixed(s, i)) {
           flush();
           boundary = r;
+          underIce = s.layers.ice[i] > 0;
         } else {
           run.push(i);
         }
