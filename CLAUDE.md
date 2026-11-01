@@ -62,7 +62,7 @@ The notes in this subsection describe the code as built. Where a rule below chan
 - Dev builds expose the play screen as `window.__play` for console poking.
 - `public/sw.js`: service worker (network-first for the page, cache-first for hashed assets; `VERSION` is stamped with the short git SHA at build by a plugin in `vite.config.ts`, so old caches are evicted on the next load). `public/manifest.webmanifest`. Icons come from `npm run icons`.
 - `npm test`, `npm run dev`, `npm run phone` (dev server on the LAN), `npm run build`.
-- Hosting: GitHub Pages via `.github/workflows/deploy.yml`. Every push to `main` runs the tests, builds, and deploys. The build uses relative paths (`base: './'`), so it works under the repo subpath.
+- Hosting: GitHub Pages via `.github/workflows/deploy.yml`, served at https://2by6vk6424.github.io/better-dots/ (repo `2by6vk6424/better-dots`). Every push to `main` runs the tests, builds, and deploys. The build uses relative paths (`base: './'`), so it works under the repo subpath.
 
 ## Vocabulary
 
