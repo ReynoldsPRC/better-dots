@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMove, goalRemaining, hasMove, parseLevel, type GameState } from '../src/rules';
+import { applyMove, applyPowerUp, goalRemaining, hasMove, parseLevel, type GameState } from '../src/rules';
 import { at, cells, game } from './helpers';
 
 const burning = (s: GameState) => s.layers.fire.flatMap((x, i) => (x ? [i] : []));
@@ -45,26 +45,57 @@ describe('fire', () => {
     expect(state.cells[spread]).toBeNull();
   });
 
-  it('does not spread on a move that put one out', () => {
-    const s = game(['.00', '212', '...'], { fire: ['x..', '...', '..x'] });
+  it('a region that had a fire put out holds still; other regions still spread', () => {
+    const s = game(['.00', '212', '1..'], { fire: ['x..', '...', '..x'] });
     const { state } = applyMove(s, cells(s, [0, 1], [0, 2]));
-    expect(burning(state)).toEqual([at(s, 2, 2)]);
+    const now = burning(state);
+    expect(now).toHaveLength(2);
+    expect(now).toContain(at(s, 2, 2));
+    expect([at(s, 1, 2), at(s, 2, 1)]).toContain(now.find((i) => i !== at(s, 2, 2)));
   });
 
-  it('does not spread onto anchors, gems, or ladybugs', () => {
+  it('putting out the middle of a zone splits it; next move each part spreads', () => {
+    const s = game(['...', '203', '201', '332'], { fire: ['xxx', '...', '...', '...'] });
+    const first = applyMove(s, cells(s, [1, 1], [2, 1])).state;
+    // The zone was hit, so it didn't spread.
+    expect(burning(first)).toEqual([0, 2]);
+    const second = applyMove(first, cells(first, [3, 0], [3, 1])).state;
+    expect(burning(second)).toHaveLength(4);
+  });
+
+  it('a blast landing on it puts it out', () => {
+    // The beam reaches (0,0); nothing next to it is cleared.
+    const s = game(['.12', '.21', '121', '.12'], {
+      fire: ['x..', 'x..', '...', '...'], pieces: [{ r: 3, c: 0, type: 'gem', color: 0, shape: 'column' }],
+    });
+    const { state } = applyPowerUp(s, { kind: 'pick', cell: at(s, 3, 0) });
+    expect(burning(state)).toEqual([]);
+  });
+
+  it('destroys an anchor it spreads onto, without credit; gems and ladybugs stop it', () => {
     const s = game(['..1', '.20', '120'], {
       fire: ['x..', '...', '...'], pieces: [{ r: 0, c: 1, type: 'gem', color: 0, shape: 'column' }, { r: 1, c: 0, type: 'anchor' }],
+      goals: [{ type: 'anchors', count: 1 }],
     });
     const { state } = applyMove(s, cells(s, [1, 2], [2, 2]));
-    expect(burning(state)).toEqual([0]);
+    expect(burning(state)).toEqual([0, at(s, 1, 0)]);
+    expect(state.cells.some((p) => p?.kind === 'anchor')).toBe(false);
+    expect(state.goals[0].progress).toBe(0);
+    const t = game(['..1', '.20', '120'], {
+      fire: ['x..', '...', '...'],
+      pieces: [{ r: 0, c: 1, type: 'gem', color: 0, shape: 'column' }, { r: 1, c: 0, type: 'ladybug', color: 1 }],
+    });
+    expect(burning(applyMove(t, cells(t, [1, 2], [2, 2])).state)).toEqual([0]);
   });
 
-  it('does not spread onto watered or slimed cells', () => {
-    // Both of the fire's neighbors are covered by another hazard, so it has nowhere to go.
+  it('spreads onto watered and slimed cells, which stay under it', () => {
     for (const other of ['water', 'slime'] as const) {
       const s = game(['.12', '212', '100'], { fire: ['x..', '...', '...'], [other]: ['.x.', 'x..', '...'] });
       const { state } = applyMove(s, cells(s, [2, 1], [2, 2]));
-      expect(burning(state), other).toEqual([0]);
+      const now = burning(state);
+      expect(now, other).toHaveLength(2);
+      const spread = now.find((i) => i !== 0)!;
+      expect(Boolean(state.layers[other][spread]), other).toBe(true);
     }
   });
 
@@ -72,7 +103,6 @@ describe('fire', () => {
     const s = game(['..2', '.12', '100'], { fire: ['.x.', 'x..', '...'], slime: ['x..', '...', '...'] });
     const { state } = applyMove(s, cells(s, [2, 1], [2, 2]));
     expect(state.layers.slime.flatMap((x, i) => (x ? [i] : []))).toEqual([0]);
-    expect(state.layers.fire[0]).toBe(false);
   });
 
   it('fire under ice is dormant: it does not spread, cannot be put out, and still counts', () => {

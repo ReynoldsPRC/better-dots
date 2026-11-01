@@ -221,8 +221,10 @@ class Move {
   private readonly toFly = new Set<number>();
   /** Bomb cells this wave: a ladybug there is removed whatever its spots. */
   private bombCells = new Set<number>();
-  /** Fires put out this move. */
-  fireOut = 0;
+  /** Burning cells put out this move. */
+  private readonly fireOut = new Set<number>();
+  /** Active burning cells a blast reached this move; they go out with the layer reactions. */
+  private readonly fireBlasted = new Set<number>();
   /** Gems already set off this move (by piece id), so each goes off once. */
   private readonly triggered = new Set<number>();
   /** Gems set off during the current blast wave; they fire in the next. */
@@ -235,6 +237,8 @@ class Move {
   private readonly slimeHits = new Map<number, number>();
   /** Active slime regions as the move began; each spreads only if none of its cells was hit. */
   private readonly slimeRegions: number[][];
+  /** Active fire regions as the move began; each spreads only if none of its cells went out. */
+  private readonly fireRegions: number[][];
 
   constructor(readonly s: GameState) {
     this.cells = s.cells.slice();
@@ -243,6 +247,7 @@ class Move {
     this.nextId = s.nextId;
     this.anchorDrops = s.anchorDrops;
     this.slimeRegions = regions(s, (i) => s.layers.slime[i] > 0 && s.layers.ice[i] === 0);
+    this.fireRegions = regions(s, (i) => s.layers.fire[i] && s.layers.ice[i] === 0);
   }
 
   /** The board as it stands mid-move, for rule queries. */
@@ -263,6 +268,12 @@ class Move {
   hitCell(i: number): void {
     if (this.layers.ice[i] > 0) this.hitIce(i);
     else if (this.layers.slime[i] > 0) this.slimeHits.set(i, (this.slimeHits.get(i) ?? 0) + 1);
+  }
+
+  /** A blast source reaching cell i: one hit on its layers, and active fire there goes out. */
+  blastCell(i: number): void {
+    if (this.layers.fire[i] && this.layers.ice[i] === 0) this.fireBlasted.add(i);
+    this.hitCell(i);
   }
 
   /**
@@ -360,7 +371,7 @@ class Move {
    * End-of-cascade layer effects, in order:
    * - Water: cleared cells touching active water become watered, and the flood
    *   carries on through every connected cleared cell.
-   * - Active fire next to a cleared cell goes out.
+   * - Active fire next to a cleared cell, or reached by a blast, goes out.
    * - Slime and ice lose one layer per hit this move: each clear on the cell
    *   and each blast source reaching it. A hit on an iced cell goes to the ice.
    *   Hazards under broken ice wake up from then on (water and slime were
@@ -389,12 +400,12 @@ class Move {
       changed.push(i);
     }
 
-    // Fire: clearing a cell next to active fire puts it out; the cell then refills.
+    // Fire: a clear next to active fire, or a blast on it, puts it out; the cell then refills.
     const burningNow = layers.fire.flatMap((f, i) => (f && layers.ice[i] === 0 ? [i] : []));
     for (const i of burningNow) {
-      if (orthogonal(s, i).some((j) => this.cleared.has(j))) {
+      if (this.fireBlasted.has(i) || orthogonal(s, i).some((j) => this.cleared.has(j))) {
         layers.fire[i] = false;
-        this.fireOut++;
+        this.fireOut.add(i);
         changed.push(i);
       }
     }
@@ -445,7 +456,7 @@ class Move {
       for (const src of sources) {
         // Each source is one hit on any ice it reaches, whatever the cell holds.
         for (const j of new Set(this.reach(src))) {
-          this.hitCell(j);
+          this.blastCell(j);
           hit.add(j);
         }
       }
@@ -457,46 +468,44 @@ class Move {
   }
 
   /**
-   * After the board settles, ignored hazards grow (seeded picks):
-   * - Fire, if none went out this move, spreads to one neighboring cell and
-   *   destroys its dot (cells with other pieces, water, or slime are safe).
-   * - Each slime region that took no hit this move spreads to one
-   *   neighboring cell at full thickness: one that isn't slimed, iced,
+   * After the board settles, ignored hazards grow (seeded picks). Each region
+   * is taken as the move began, and grows by one neighboring cell only if
+   * none of its cells was hit this move:
+   * - Fire spreads onto a cell that isn't burning or iced, destroying a dot or
+   *   anchor there (counted toward nothing). Gems and ladybugs stop it. Water
+   *   and slime stay under the new fire.
+   * - Slime spreads at full thickness onto a cell that isn't slimed, iced,
    *   watered, or burning. Pieces and empty cells don't stop it.
    */
   spread(): void {
     const { s, layers, cells } = this;
-    const unfrozen = (i: number) => layers.ice[i] === 0;
-    const pickNext = (layer: readonly (boolean | number)[], ok: (j: number) => boolean): number | null => {
-      const options = new Set<number>();
-      for (let i = 0; i < layer.length; i++) {
-        if (!layer[i] || !unfrozen(i)) continue;
-        for (const j of orthogonal(s, i)) if (!layer[j] && unfrozen(j) && ok(j)) options.add(j);
+    const grow = (regs: number[][], hit: (i: number) => boolean, ok: (j: number) => boolean): number[] => {
+      // Two regions never take the same cell.
+      const out: number[] = [];
+      for (const region of regs) {
+        if (region.some(hit)) continue;
+        const options = new Set<number>();
+        for (const i of region) for (const j of orthogonal(s, i)) if (ok(j) && !out.includes(j)) options.add(j);
+        if (options.size === 0) continue;
+        out.push(this.rng.pick([...options].sort((a, b) => a - b)));
       }
-      return options.size === 0 ? null : this.rng.pick([...options].sort((a, b) => a - b));
+      return out;
     };
-    if (this.fireOut === 0) {
-      const target = pickNext(layers.fire, (j) => (cells[j] === null || cells[j]!.kind === 'dot') && !layers.water[j] && layers.slime[j] === 0);
-      if (target !== null) {
-        layers.fire[target] = true;
-        cells[target] = null;
-        this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: [target] });
-      }
+
+    const burnable = (j: number) => {
+      const k = cells[j]?.kind;
+      return !layers.fire[j] && layers.ice[j] === 0 && (k === undefined || k === 'dot' || k === 'anchor');
+    };
+    const burned = grow(this.fireRegions, (i) => this.fireOut.has(i), burnable);
+    for (const j of burned) {
+      layers.fire[j] = true;
+      cells[j] = null;
     }
-    const slimed: number[] = [];
-    for (const region of this.slimeRegions) {
-      if (region.some((i) => this.slimeHits.has(i))) continue;
-      const options = new Set<number>();
-      for (const i of region) {
-        for (const j of orthogonal(s, i)) {
-          if (layers.slime[j] === 0 && unfrozen(j) && !layers.water[j] && !layers.fire[j]) options.add(j);
-        }
-      }
-      if (options.size === 0) continue;
-      const target = this.rng.pick([...options].sort((a, b) => a - b));
-      layers.slime[target] = 2;
-      slimed.push(target);
-    }
+    if (burned.length > 0) this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: burned });
+
+    const slimeable = (j: number) => layers.slime[j] === 0 && layers.ice[j] === 0 && !layers.water[j] && !layers.fire[j];
+    const slimed = grow(this.slimeRegions, (i) => this.slimeHits.has(i), slimeable);
+    for (const j of slimed) layers.slime[j] = 2;
     if (slimed.length > 0) this.emit({ kind: 'layers', layers: cloneLayers(layers), cells: slimed });
   }
 

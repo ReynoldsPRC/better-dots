@@ -1,7 +1,7 @@
 {
   "id": "0cpbup1p",
   "seed": 920763,
-  "moves": 10,
+  "moves": 19,
   "colors": [1, 2, 3, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "fire" }
   ],
-  "stars": { "two": 7, "three": 5 },
-  "bot": { "runs": 100, "winRate": 0.79, "median": 8, "p10": 5 }
+  "stars": { "two": 14, "three": 10 },
+  "bot": { "runs": 100, "winRate": 0.78, "median": 15, "p10": 10 }
 }

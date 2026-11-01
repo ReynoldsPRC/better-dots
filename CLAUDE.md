@@ -245,7 +245,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 
 ## Build order
 
-Steps 1–7 and 8.1–8.2 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
+Steps 1–7 and 8.1–8.3 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
 
 1. Setup: PWA shell, rules module, test harness, config file, seeded RNG, and free static hosting (GitHub Pages or similar) so every working build can be opened on the phone.
 2. Core loop on one hardcoded board: drag, clear, gravity, refill, loops, bombs, moves, the collect-color goal, win/lose, auto-shuffle, colorblind symbols. Playtest on the phone until the feel is right before moving on.
