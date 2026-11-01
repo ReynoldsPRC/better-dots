@@ -61,7 +61,7 @@ function neighbors(s: GameState, i: number): number[] {
 
 /**
  * Distinct closed loops inside the group (one per non-tree edge of a DFS),
- * best first: by how many other-color dots and ladybugs they enclose (each a
+ * best first: by how many other-color dots they enclose (each a
  * bomb), then by how many gems those bombs would reach. At most `max`.
  */
 export function findLoops(s: GameState, group: number[], max = 4): number[][] {
@@ -74,7 +74,7 @@ export function findLoops(s: GameState, group: number[], max = 4): number[][] {
     const color = connectableColor(s, path[0]);
     const bombs = enclosedCells(s, path).filter((i) => {
       const p = s.cells[i];
-      return (p?.kind === 'dot' || p?.kind === 'ladybug') && p.color !== color;
+      return p?.kind === 'dot' && p.color !== color;
     });
     const hit = new Set<number>();
     for (const b of bombs) for (const j of cellsAround(s, b, s.bombRadius)) if (s.cells[j]?.kind === 'gem') hit.add(j);

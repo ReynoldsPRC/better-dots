@@ -1,7 +1,7 @@
 {
   "id": "ug3210l6",
   "seed": 306896,
-  "moves": 14,
+  "moves": 10,
   "colors": [0, 1, 2, 4],
   "layout": [
     ".......",
@@ -25,6 +25,6 @@
     { "type": "ladybugs", "count": 3 },
     { "type": "collect", "color": 4, "count": 12 }
   ],
-  "stars": { "two": 11, "three": 8 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 12, "p10": 8 }
+  "stars": { "two": 8, "three": 7 },
+  "bot": { "runs": 100, "winRate": 0.83, "median": 9, "p10": 7 }
 }

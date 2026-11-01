@@ -145,7 +145,7 @@ function placePieces(p: GenParams, layout: string[], palette: ColorId[], rng: Rn
     const c = rng.int(p.cols);
     if (!free(r, c)) continue;
     taken.add(r * p.cols + c);
-    out.push({ r, c, type: 'ladybug', color: palette[(k + 1) % palette.length] });
+    out.push({ r, c, type: 'ladybug', color: palette[(k + 1) % palette.length], facing: rng.pick(['up', 'down', 'left', 'right'] as const) });
     k++;
   }
   return out;

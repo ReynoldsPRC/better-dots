@@ -1,7 +1,7 @@
 {
   "id": "pj8kaf8c",
   "seed": 328433,
-  "moves": 9,
+  "moves": 5,
   "colors": [0, 1, 2],
   "layout": [
     "......",
@@ -17,6 +17,6 @@
   "goals": [
     { "type": "ladybugs", "count": 1 }
   ],
-  "stars": { "two": 6, "three": 5 },
-  "bot": { "runs": 100, "winRate": 0.81, "median": 7, "p10": 6 }
+  "stars": { "two": 3, "three": 2 },
+  "bot": { "runs": 100, "winRate": 0.92, "median": 4, "p10": 4 }
 }

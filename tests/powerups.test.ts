@@ -52,14 +52,17 @@ describe('pick', () => {
     expect(state.layers.water[at(s, 0, 1)]).toBe(true);
   });
 
-  it('a ladybug loses a spot and flies; on its last spot it is removed', () => {
+  it('a ladybug loses a spot and stays put; on its last spot it is removed and its bomb goes off', () => {
     const bug = (spots: number) => game(['012', '120', '200'], {
       pieces: [{ r: 1, c: 1, type: 'ladybug', color: 2, spots }], goals: [{ type: 'ladybugs', count: 1 }],
     });
     const hit = applyPowerUp(bug(3), { kind: 'pick', cell: at(bug(3), 1, 1) });
-    expect(hit.result.events.some((e) => e.kind === 'fly')).toBe(true);
+    expect(hit.result.events.some((e) => e.kind === 'walk')).toBe(false);
+    expect(hit.state.cells.findIndex((p) => p?.kind === 'ladybug')).toBe(at(bug(3), 1, 1));
     expect(hit.state.cells.find((p) => p?.kind === 'ladybug')).toMatchObject({ spots: 2 });
-    expect(applyPowerUp(bug(1), { kind: 'pick', cell: at(bug(1), 1, 1) }).state.status).toBe('won');
+    const last = applyPowerUp(bug(1), { kind: 'pick', cell: at(bug(1), 1, 1) });
+    expect(last.state.status).toBe('won');
+    expect(last.result.steps.map((x) => x.kind)).toEqual(['line', 'blast']);
   });
 
   it('on a gem, sets it off', () => {

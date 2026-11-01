@@ -104,9 +104,8 @@ export const config = {
   ladybug: {
     /** Ladybug size as a multiple of dot radius. */
     scale: 1.15,
-    /** Flight time, and how high (in cells) the flight arcs. */
-    flyMs: 420,
-    arc: 0.6,
+    /** Time for a ladybug's one-cell walk (and its turn) after a move. */
+    walkMs: 260,
     /** Head and spot color. */
     ink: { light: '#2E2B28', dark: '#1A1917' },
   },

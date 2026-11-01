@@ -109,8 +109,8 @@ export class MoveAnimation {
         case 'layers':
           seg.dur = config.ice.crackMs;
           break;
-        case 'fly':
-          seg.dur = config.ladybug.flyMs;
+        case 'walk':
+          seg.dur = config.ladybug.walkMs;
           break;
         case 'shuffle':
           seg.dur = config.shuffle.delayMs + config.shuffle.moveMs;
@@ -122,7 +122,7 @@ export class MoveAnimation {
     }
     this.end = start + t;
     // The last segment that moves pieces; a fall's settle bounce doesn't block input.
-    const moving = this.segments.filter((s) => s.dur > 0 && ['fall', 'sink', 'fly', 'shuffle'].includes(s.event.kind)).at(-1);
+    const moving = this.segments.filter((s) => s.dur > 0 && ['fall', 'sink', 'walk', 'shuffle'].includes(s.event.kind)).at(-1);
     this.inputAt = !moving ? this.end : start + moving.start + moving.dur - (moving.event.kind === 'fall' ? settleMs : 0);
     const firstClear = this.segments.find((s) => s.event.kind === 'clear');
     this.hudAt = start + (firstClear ? firstClear.start + popMs : 0);
@@ -219,15 +219,15 @@ export class MoveAnimation {
         }
         return out;
       }
-      case 'fly': {
-        // Each ladybug arcs to its new cell; the dot it lands on slides over to where the ladybug was.
-        const p = ease('easeInOutQuad', lt / config.ladybug.flyMs);
-        const moving = new Map<number, { from: number; to: number; lift: number }>();
+      case 'walk': {
+        // Each ladybug steps to the next cell while what was there slides back into its place.
+        const p = ease('easeInOutQuad', lt / config.ladybug.walkMs);
+        const moving = new Map<number, { from: number; to: number }>();
         for (const m of event.moves) {
           const bug = event.board[m.to];
-          const dot = event.board[m.from];
-          if (bug) moving.set(bug.id, { from: m.from, to: m.to, lift: config.ladybug.arc });
-          if (dot) moving.set(dot.id, { from: m.to, to: m.from, lift: 0 });
+          const other = event.board[m.from];
+          if (bug) moving.set(bug.id, { from: m.from, to: m.to });
+          if (other) moving.set(other.id, { from: m.to, to: m.from });
         }
         return event.board.flatMap((piece, i) => {
           if (!piece) return [];
@@ -235,8 +235,7 @@ export class MoveAnimation {
           if (!mv) return [{ id: piece.id, piece, r: Math.floor(i / cols), c: i % cols, scale: 1, alpha: 1 }];
           const [r0, c0] = [Math.floor(mv.from / cols), mv.from % cols];
           const [r1, c1] = [Math.floor(mv.to / cols), mv.to % cols];
-          const r = r0 + (r1 - r0) * p - mv.lift * Math.sin(Math.PI * p);
-          return [{ id: piece.id, piece, r, c: c0 + (c1 - c0) * p, scale: 1 + (mv.lift ? 0.25 * Math.sin(Math.PI * p) : 0), alpha: 1 }];
+          return [{ id: piece.id, piece, r: r0 + (r1 - r0) * p, c: c0 + (c1 - c0) * p, scale: 1, alpha: 1 }];
         });
       }
       case 'shuffle': {

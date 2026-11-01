@@ -47,7 +47,7 @@ The notes in this subsection describe the code as built. Where a rule below chan
 - Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`), `anchorDrops` (how many more anchors drop in), and with it optional `maxOnBoard` and `dropDelay`. A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than `maxOnBoard` (default: the starting count, at least one) and the wait is over, until drops run out; at most one per move. The wait (`state.anchorWait`) counts down one per move while the board is short and resets to `dropDelay` whenever it's full, so `dropDelay` is a grace period of that many moves. Blasts destroy anchors and count them (`Move.clear` with `blast`). Anchor goals: `{ "type": "anchors", "count" }`.
 - Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Ice hits are collected during the move (`Move.hitIce`) and applied together at the end of the cascade, after water, fire, and slime have reacted, so a hazard freed this move stays dormant for that move. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
 - Gems are placed with `pieces`: `{ "r", "c", "type": "gem", "color", "shape": "row" | "column" | "cross" }`. Gem goal: `{ "type": "gems", "count" }`. Beams are blast sources, so they also destroy anchors (counted) and put out fire.
-- Ladybugs are placed with `pieces`: `{ "r", "c", "type": "ladybug", "color", "spots"? }` (spots default 3). Ladybug goal: `{ "type": "ladybugs", "count" }` counts ladybugs removed. *(The piece keeps the `ladybug` type name in code and level files; the original calls them Beetle Dots. The beetle migration adds `"facing": "up" | "down" | "left" | "right"`.)*
+- Ladybugs are placed with `pieces`: `{ "r", "c", "type": "ladybug", "color", "spots"?, "facing"? }` (spots default 3, facing `"up" | "down" | "left" | "right"`, default `up`). Ladybug goal: `{ "type": "ladybugs", "count" }` counts ladybugs removed. The piece keeps the `ladybug` type name in code and level files; the original calls them Beetle Dots. A ladybug removed on its last spot queues a bomb that joins the next blast wave (`Move.bugBombs`). Walking is `Move.walk`, after hazards spread; it emits a `walk` event.
 - Level files may have `fire` (a grid: `.` or `x` burning; a burning cell's layout must be `.` and it can't hold a piece). Fire goal: `{ "type": "fire" }`; remaining = burning cells, including dormant ones under ice (frozen fire holds no dot).
 - Level files may have `slime` (a grid: `.` clean, `1` or `2` hits left; `x` means 2). `state.layers.slime` holds hits left per cell. Slime goal: `{ "type": "slime" }`; remaining = slimed cells, including dormant ones under ice. A hit on a cell (`Move.hitCell`) goes to its ice if it's iced, else to its slime. Slime regions are taken as the move begins; a region spreads only if none of its cells was hit.
 - Level files may have `water` (a grid: `.` dry, `x` watered). Flood goal: `{ "type": "flood" }`. Water under ice is dormant: it doesn't spread until the ice breaks, and a move that breaks the ice doesn't flood from it (the water was still frozen while that move's cells cleared).
@@ -185,7 +185,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 - Start with 3 spots. Connectable like a dot of their current color. Falls like a dot. Has a facing direction.
 - One hit = being in a connection, a loop of its color, a blast, or a Color Burst / Eraser. A hit removes one spot and changes it to a different seeded color, at most one spot per move. Touch-and-hold on a ladybug previews its next color.
 - At the third hit it flies away and leaves a bomb on its cell, which explodes in the same cascade.
-- **Walks when ignored.** After the board settles, each ladybug that took no hit this move moves one cell in its facing direction, swapping places with what's there (a dot, wild, anchor, nesting dot, or empty-but-playable cell). If the next cell is off the board, empty space, a block, a fixed piece, or another ladybug, it turns 90° clockwise instead `(default direction)` and doesn't move this turn.
+- **Walks when ignored.** After the board settles, each ladybug that took no hit this move moves one cell in its facing direction, swapping places with what's there (a dot, wild, anchor, nesting dot, or empty-but-playable cell). If the next cell is off the board, empty space, a block, a fixed piece, or another ladybug, it turns 90° clockwise instead `(default direction)` and doesn't move this turn. Gems, burning cells, and legacy walls also stop it `(default)`. Ladybugs act one at a time in board order, so one blocked by another that hasn't moved yet turns `(default)`. A level that doesn't give a facing gets `up` `(default)`.
 - A loop around a ladybug does nothing to it; it isn't a dot `(default; original undocumented)`.
 - Ladybugs don't count toward collect goals; reshuffles leave them in place.
 - Goal option: clear N ladybugs.
@@ -245,7 +245,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 
 ## Build order
 
-Steps 1–7 and 8.1–8.5 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
+Steps 1–7 and 8.1–8.6 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
 
 1. Setup: PWA shell, rules module, test harness, config file, seeded RNG, and free static hosting (GitHub Pages or similar) so every working build can be opened on the phone.
 2. Core loop on one hardcoded board: drag, clear, gravity, refill, loops, bombs, moves, the collect-color goal, win/lose, auto-shuffle, colorblind symbols. Playtest on the phone until the feel is right before moving on.
@@ -278,7 +278,7 @@ Each is tagged `(default)` above. Revisit after playtesting; a change is a one-l
 - Monster HP drops one per other dot in the connection; one per loop/color clear of its color; +1 per move it eats; what it won't eat
 - Lotus persists, doesn't fall, isn't connectable
 - Magnet moves to the end of the drag
-- Ladybug turns clockwise when blocked; a loop around it does nothing
+- Ladybug turns clockwise when blocked; a loop around it does nothing; gems, fire, and walls block it; board order; default facing up
 - Wild-only connections are legal; a loop around an anchor does nothing
 - Teleported anchors don't sink at the pad
 - At most one new anchor drops per move

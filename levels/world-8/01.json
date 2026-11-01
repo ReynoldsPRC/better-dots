@@ -20,5 +20,5 @@
     { "type": "ladybugs", "count": 2 }
   ],
   "stars": { "two": 5, "three": 4 },
-  "bot": { "runs": 100, "winRate": 0.81, "median": 6, "p10": 4 }
+  "bot": { "runs": 100, "winRate": 0.88, "median": 6, "p10": 4 }
 }

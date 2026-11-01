@@ -1,6 +1,6 @@
 // Draws the board: background, connection line, dots, and effects.
 import { config } from '../config';
-import { connectableColor, type ColorId, type GameState, type GemShape, type Layers, type Piece } from '../rules';
+import { connectableColor, type ColorId, type Facing, type GameState, type GemShape, type Layers, type Piece } from '../rules';
 import type { Surface, Theme } from './canvas';
 import type { Frame, LayerChange, SpriteFrame } from './animation';
 import { ease } from './easing';
@@ -383,18 +383,28 @@ export function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number
     case 'gem':
       return drawGem(ctx, x, y, r, piece.color, piece.shape, opts);
     case 'ladybug':
-      return drawLadybug(ctx, x, y, r, piece.color, piece.spots, opts);
+      return drawLadybug(ctx, x, y, r, piece.color, piece.spots, piece.facing, opts);
   }
 }
 
+const FACING_ANGLE: Record<Facing, number> = { up: 0, right: Math.PI / 2, down: Math.PI, left: -Math.PI / 2 };
+
 /**
- * A ladybug: a shell in its current color with a dark head, a seam down the
- * back, and one dark spot per remaining spot.
+ * A ladybug: a shell in its current color with a dark head (pointing the way
+ * it walks), a seam down the back, and one dark spot per remaining spot.
  */
-function drawLadybug(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, spots: number, opts: DrawOptions) {
+function drawLadybug(
+  ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: ColorId, spots: number, facing: Facing, opts: DrawOptions,
+) {
   const s = r * config.ladybug.scale;
   const ink = config.ladybug.ink[opts.theme];
+  const angle = FACING_ANGLE[facing];
+  // Drawn facing up around the origin, then turned.
+  const x = 0;
+  const y = 0;
   ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
   ctx.fillStyle = ink;
   ctx.beginPath();
   ctx.arc(x, y - s * 0.78, s * 0.42, Math.PI, 0);
@@ -417,7 +427,13 @@ function drawLadybug(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
     ctx.fill();
   }
   ctx.restore();
-  if (opts.colorblind) drawSymbol(ctx, x - s * 0.42, y + s * 0.5, s * 0.26, color, config.background[opts.theme]);
+  if (opts.colorblind) {
+    // The symbol rides on the shell but stays upright, so it reads the same whichever way the ladybug faces.
+    const [dx, dy] = [-s * 0.42, s * 0.5];
+    const sx = cx + dx * Math.cos(angle) - dy * Math.sin(angle);
+    const sy = cy + dx * Math.sin(angle) + dy * Math.cos(angle);
+    drawSymbol(ctx, sx, sy, s * 0.26, color, config.background[opts.theme]);
+  }
 }
 
 /**

@@ -5,7 +5,7 @@ import { canCross, cellsAround, toIndex } from './board';
 import { connectableColor, enclosedCells, isLoopClosed, isValidPath } from './path';
 import { Rng, seedRng } from './rng';
 import type {
-  BlastSource, Cells, ClearKind, ClearStep, ColorId, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, PowerUp, Tally,
+  BlastSource, Cells, ClearKind, ClearStep, ColorId, Facing, GameState, GoalState, Layers, LevelDef, MoveEvent, MoveResult, Piece, PowerUp, Tally,
 } from './types';
 
 export interface GameOptions {
@@ -50,7 +50,7 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     cells[i] =
       p.type === 'anchor' ? { kind: 'anchor', id: nextId++ } :
       p.type === 'gem' ? { kind: 'gem', id: nextId++, color: p.color, shape: p.shape } :
-      { kind: 'ladybug', id: nextId++, color: p.color, spots: p.spots ?? 3 };
+      { kind: 'ladybug', id: nextId++, color: p.color, spots: p.spots ?? 3, facing: p.facing ?? 'up' };
   }
 
   const { wallRight, wallDown } = placeWalls(level, rows, cols);
@@ -221,10 +221,8 @@ class Move {
   readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0, gems: 0, ladybugs: 0 };
   /** Ladybugs already hit this move (by id): each loses at most one spot per move. */
   private readonly bugsHit = new Set<number>();
-  /** Ladybugs that lost a spot and will fly once the cascade settles. */
-  private readonly toFly = new Set<number>();
-  /** Bomb cells this wave: a ladybug there is removed whatever its spots. */
-  private bombCells = new Set<number>();
+  /** Bombs left by ladybugs removed on their last spot; they go off in the next wave. */
+  private bugBombs: BlastSource[] = [];
   /** Burning cells put out this move. */
   private readonly fireOut = new Set<number>();
   /** Active burning cells a blast reached this move; they go out with the layer reactions. */
@@ -310,40 +308,54 @@ class Move {
   }
 
   /**
-   * A ladybug loses a spot and changes color (it flies later), or is removed
-   * on its last spot or when it's a bomb. The cell counts as cleared either way.
+   * A ladybug loses a spot and changes color, or on its last spot is removed
+   * and leaves a bomb on its cell. The cell counts as cleared either way.
    * Returns true if it was removed.
    */
   private hitLadybug(i: number, p: Extract<Piece, { kind: 'ladybug' }>): boolean {
     this.bugsHit.add(p.id);
     this.cleared.add(i);
-    if (p.spots <= 1 || this.bombCells.has(i)) {
+    if (p.spots <= 1) {
       this.cells[i] = null;
       this.tally.ladybugs++;
+      this.bugBombs.push({ cell: i, type: 'bomb' });
       return true;
     }
     const others = this.s.colors.filter((c) => c !== p.color);
     const color = others.length > 0 ? this.rng.pick(others) : p.color;
     this.cells[i] = { ...p, spots: p.spots - 1, color };
-    this.toFly.add(p.id);
     return false;
   }
 
-  /** Ladybugs that lost a spot fly to random cells, swapping with the dots there. */
-  fly(): void {
-    if (this.toFly.size === 0) return;
+  /**
+   * After the board settles, each ladybug that took no hit this move (in
+   * board order) steps one cell the way it faces, swapping with a dot, an
+   * anchor, or an empty cell there. Off the board, a missing cell, a wall, a
+   * burning cell, a gem, or another ladybug turns it clockwise instead.
+   * Settles again if anything moved.
+   */
+  walk(): void {
+    const { s, cells, layers } = this;
     const moves: { from: number; to: number }[] = [];
-    // Fly each once, in board order as of now (a ladybug can land on a later cell).
-    const flying = this.cells.flatMap((p) => (p?.kind === 'ladybug' && this.toFly.has(p.id) ? [p.id] : []));
-    for (const id of flying) {
-      const i = this.cells.findIndex((p) => p?.id === id);
-      const spots = this.cells.flatMap((q, j) => (q?.kind === 'dot' && j !== i ? [j] : []));
-      if (spots.length === 0) continue;
-      const to = this.rng.pick(spots);
-      [this.cells[i], this.cells[to]] = [this.cells[to], this.cells[i]];
-      moves.push({ from: i, to });
+    let turned = false;
+    const walkers = cells.flatMap((p) => (p?.kind === 'ladybug' && !this.bugsHit.has(p.id) ? [p.id] : []));
+    for (const id of walkers) {
+      const i = cells.findIndex((p) => p?.id === id);
+      const bug = cells[i] as Extract<Piece, { kind: 'ladybug' }>;
+      const j = ahead(s, i, bug.facing);
+      const there = j >= 0 ? cells[j] : undefined;
+      const open = j >= 0 && canCross(s, i, j) && !layers.fire[j] && (there === null || there?.kind === 'dot' || there?.kind === 'anchor');
+      if (!open) {
+        cells[i] = { ...bug, facing: CLOCKWISE[bug.facing] };
+        turned = true;
+        continue;
+      }
+      cells[i] = there ?? null;
+      cells[j] = bug;
+      moves.push({ from: i, to: j });
     }
-    if (moves.length > 0) this.emit({ kind: 'fly', moves });
+    if (moves.length > 0 || turned) this.emit({ kind: 'walk', moves });
+    if (moves.length > 0) this.settle();
   }
 
   /** Sets off the gem at i (if there is one, unfrozen and not yet set off). */
@@ -440,13 +452,8 @@ class Move {
     const s = this.s;
     const view = this.view();
     const first = loop ? this.cells.flatMap((_, i) => (connectableColor(view, i) === color ? [i] : [])) : path;
-    // Dots and ladybugs enclosed by a loop that aren't its color become bombs.
-    const bombs = loop
-      ? enclosedCells(s, path).filter((i) => {
-          const k = this.cells[i]?.kind;
-          return (k === 'dot' || k === 'ladybug') && !first.includes(i);
-        })
-      : [];
+    // Dots enclosed by a loop that aren't its color become bombs (a ladybug in there is left alone).
+    const bombs = loop ? enclosedCells(s, path).filter((i) => this.cells[i]?.kind === 'dot' && !first.includes(i)) : [];
     // A loop sets off every gem of its color; they fire with the bombs. A frozen one's ice takes a hit instead.
     const gems = loop
       ? this.cells.flatMap((p, i) => {
@@ -460,9 +467,20 @@ class Move {
     this.waves([...bombs.map((cell): BlastSource => ({ cell, type: 'bomb' })), ...gems]);
   }
 
-  /** Blast waves: each fires together; gems a wave reaches fire in the next one. */
+  /** Ladybug bombs waiting to go off, taken from the queue. */
+  private takeBugBombs(): BlastSource[] {
+    const out = this.bugBombs;
+    this.bugBombs = [];
+    return out;
+  }
+
+  /**
+   * Blast waves: each fires together; gems a wave reaches, and bombs left by
+   * ladybugs it removes, fire in the next one. Bombs left by ladybugs the
+   * line or loop removed join the first wave.
+   */
   waves(start: BlastSource[]): void {
-    let sources = start.slice().sort((a, b) => a.cell - b.cell);
+    let sources = [...start, ...this.takeBugBombs()].sort((a, b) => a.cell - b.cell);
     while (sources.length > 0) {
       const hit = new Set<number>();
       for (const src of sources) {
@@ -473,9 +491,8 @@ class Move {
         }
       }
       this.nextWave = [];
-      this.bombCells = new Set(sources.filter((x) => x.type === 'bomb').map((x) => x.cell));
       this.stage('blast', hit, sources);
-      sources = this.nextWave.sort((a, b) => a.cell - b.cell);
+      sources = [...this.nextWave, ...this.takeBugBombs()].sort((a, b) => a.cell - b.cell);
     }
   }
 
@@ -608,6 +625,18 @@ class Move {
   }
 }
 
+const CLOCKWISE: Record<Facing, Facing> = { up: 'right', right: 'down', down: 'left', left: 'up' };
+
+/** The cell one step from i the given way, or -1 off the board. */
+function ahead(s: GameState, i: number, facing: Facing): number {
+  const r = Math.floor(i / s.cols);
+  const c = i % s.cols;
+  if (facing === 'up') return r > 0 ? i - s.cols : -1;
+  if (facing === 'down') return r + 1 < s.rows ? i + s.cols : -1;
+  if (facing === 'left') return c > 0 ? i - 1 : -1;
+  return c + 1 < s.cols ? i + 1 : -1;
+}
+
 /** Orthogonally connected groups of cells where `inside` holds, each sorted, in board order. */
 function regions(s: GameState, inside: (i: number) => boolean): number[][] {
   const seen = new Set<number>();
@@ -671,9 +700,9 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   const m = new Move(s);
   m.cascade(path, color, loop);
   m.react();
-  m.fly();
   m.settle();
   m.spread();
+  m.walk();
   return finish(s, m, { path: path.slice(), color, loop, usesMove: true });
 }
 
@@ -719,10 +748,10 @@ export function applyPowerUp(s: GameState, p: PowerUp): { state: GameState; resu
       m.waves([m.trigger(i)!]);
     } else {
       m.stage('line', [i]);
+      m.waves([]);
     }
   }
   m.react();
-  m.fly();
   m.settle();
   return finish(s, m, { path: [], color, loop: p.kind === 'colorClear', usesMove: false });
 }

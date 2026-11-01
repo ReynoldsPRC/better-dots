@@ -33,16 +33,20 @@ export interface Gem {
   shape: GemShape;
 }
 
+export type Facing = 'up' | 'down' | 'left' | 'right';
+
 /**
- * Connectable like a dot of its current color. Each clear costs a spot; with
- * spots left it changes color and flies to a random cell. Cleared on its last
- * spot, or at once if a loop encloses it.
+ * Connectable like a dot of its current color (the original's Beetle Dot).
+ * Each hit costs a spot (at most one per move) and changes its color; the
+ * last spot removes it and leaves a bomb on its cell. A move that doesn't hit
+ * it, it walks one cell the way it faces, or turns clockwise if it can't.
  */
 export interface Ladybug {
   kind: 'ladybug';
   id: number;
   color: ColorId;
   spots: number;
+  facing: Facing;
 }
 
 export type Piece = Dot | Anchor | Gem | Ladybug;
@@ -59,7 +63,7 @@ export interface Wall {
 export type PlacedPiece =
   | { r: number; c: number; type: 'anchor' }
   | { r: number; c: number; type: 'gem'; color: ColorId; shape: GemShape }
-  | { r: number; c: number; type: 'ladybug'; color: ColorId; spots?: number };
+  | { r: number; c: number; type: 'ladybug'; color: ColorId; spots?: number; facing?: Facing };
 
 export type Goal =
   | { type: 'collect'; color: ColorId; count: number }
@@ -202,8 +206,8 @@ export type MoveEvent = { board: Cells } & (
   | { kind: 'fall'; spawnFrom: Record<number, number> }
   /** Anchors that reached the bottom and were removed. */
   | { kind: 'sink'; cells: number[] }
-  /** Ladybugs flying off after a hit, each swapping places with the dot where it lands. */
-  | { kind: 'fly'; moves: { from: number; to: number }[] }
+  /** Ladybugs that weren't hit walk one cell, swapping with what's there; blocked ones turn (their new facing is on the board). */
+  | { kind: 'walk'; moves: { from: number; to: number }[] }
   /** Cell layers changed (ice cracked, ...). `layers` is the new state; `cells` are the ones that changed. */
   | { kind: 'layers'; layers: Layers; cells: number[] }
   | { kind: 'shuffle' }
