@@ -113,7 +113,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 - **Blasts destroy anchors and count** toward the anchor goal. A loop around an anchor doesn't make it a bomb and does nothing to it.
 - Fire spreading onto an anchor, or a monster eating one, destroys it **without** credit.
 - Anchors travel through teleporters; beetles swap places with them; slime can cover the cell under one.
-- Spawning: a new anchor drops into the top of a seeded column whenever fewer anchors are on the board than `maxOnBoard` (default: the starting count, at least 1), after `dropDelay` moves (default 0), until drops run out. Level data: `anchorDrops`, optional `maxOnBoard`, optional `dropDelay`.
+- Spawning: a new anchor drops into the top of a seeded column whenever fewer anchors are on the board than `maxOnBoard` (default: the starting count, at least 1), after `dropDelay` moves (default 0), until drops run out. At most one new anchor drops per move `(default)`. Level data: `anchorDrops`, optional `maxOnBoard`, optional `dropDelay`.
 
 ### Ice
 - A layer on a cell, thickness 1–3, each with a distinct look (fresh, cracked, nearly broken). Ice does **not** lock the dot: the dot on an iced cell is connectable, falls out when the cells below clear, and is replaced from above like any other dot. Ice never blocks falling.
@@ -277,5 +277,6 @@ Each is tagged `(default)` above. Revisit after playtesting; a change is a one-l
 - Ladybug turns clockwise when blocked; a loop around it does nothing
 - Wild-only connections are legal; a loop around an anchor does nothing
 - Teleported anchors don't sink at the pad
+- At most one new anchor drops per move
 - Train cars swap cargo with the cell ahead and reverse at track ends
 - Star cutoffs; power-ups cost no move
