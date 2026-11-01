@@ -64,11 +64,12 @@ describe('gems', () => {
     expect(state.status).toBe('won');
   });
 
-  it('frozen gems are protected; their ice cracks instead', () => {
-    const s = game(['0011', '0022', '1213', '2121'], { pieces: [gem(1, 2, 0, 'column')], ice: ['....', '..2.', '....', '....'] });
+  it('frozen gems are protected; a trigger hits their ice instead', () => {
+    const s = game(['0011', '0022', '1213', '2121'], { pieces: [gem(3, 3, 0, 'column')], ice: ['....', '....', '....', '...2'] });
     const { state, result } = applyMove(s, square(s));
     expect(result.steps.map((x) => x.kind)).toEqual(['loop']);
-    expect(state.layers.ice[at(s, 1, 2)]).toBe(1);
+    expect(state.layers.ice[at(s, 3, 3)]).toBe(1);
+    expect(state.cells[at(s, 3, 3)]?.kind).toBe('gem');
   });
 
   it('gems fall with gravity', () => {

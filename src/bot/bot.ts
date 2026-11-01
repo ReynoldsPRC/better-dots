@@ -74,7 +74,7 @@ export function findLoops(s: GameState, group: number[], max = 4): number[][] {
     const color = connectableColor(s, path[0]);
     const bombs = enclosedCells(s, path).filter((i) => {
       const p = s.cells[i];
-      return (p?.kind === 'dot' || p?.kind === 'ladybug') && p.color !== color && s.layers.ice[i] === 0;
+      return (p?.kind === 'dot' || p?.kind === 'ladybug') && p.color !== color;
     });
     const hit = new Set<number>();
     for (const b of bombs) for (const j of cellsAround(s, b, s.bombRadius)) if (s.cells[j]?.kind === 'gem') hit.add(j);
@@ -128,7 +128,7 @@ function* cycles(s: GameState, group: number[]): Generator<number[]> {
 
 /**
  * Cells worth clearing for reasons a plain "clear the most" search misses:
- * the cells under anchors (so they drop), next to ice (to crack it), and dry
+ * the cells under anchors (so they drop), iced cells (to crack them), dry
  * cells next to active water (to spread it), ladybugs, slimed cells, and
  * cells next to fire (to put it out).
  */
@@ -142,10 +142,10 @@ export function targetCells(s: GameState): Set<number> {
     if (p?.kind === 'anchor') {
       for (let j = i + s.cols; j < s.cells.length; j += s.cols) if (s.cells[j]) out.add(j);
     }
-    if (s.layers.ice[i] > 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
-    if (p?.kind === 'ladybug' && s.layers.ice[i] === 0) out.add(i);
+    if (s.layers.ice[i] > 0 && p) out.add(i);
+    if (p?.kind === 'ladybug') out.add(i);
     if (s.layers.slime[i] && s.layers.ice[i] === 0 && p) out.add(i);
-    if (s.layers.fire[i] && s.layers.ice[i] === 0) for (const j of neighbors(s, i)) if (s.cells[j] && s.layers.ice[j] === 0) out.add(j);
+    if (s.layers.fire[i] && s.layers.ice[i] === 0) for (const j of neighbors(s, i)) if (s.cells[j]) out.add(j);
   });
   return out;
 }

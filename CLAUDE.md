@@ -42,10 +42,10 @@ The notes in this subsection describe the code as built. Where a rule below chan
 
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
 - `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` whose `events` list what happened in order (`clear` stages, `fall`, `sink`, `shuffle`, ...), each with the board after it. `src/render/animation.ts` replays that list, so a new mechanic adds an event kind and a way to draw it.
-- Gravity works per column in runs between fixed cells (currently frozen or burning cells; after the ice migration, burning cells and blocks). Pieces fall to the bottom of their run. The top run refills from above the board. In a run under a burning cell or block, new dots appear in place (they grow in) since nothing can fall through. *(Current code: a run under a frozen cell doesn't refill, and the gap under the ice stays empty until the ice breaks. That behavior goes away with the ice migration; ice no longer blocks falling.)*
+- Gravity works per column in runs between fixed cells (currently burning cells; blocks join them when built). Ice is not fixed: pieces fall into and out of iced cells, and the ice stays with the cell. Pieces fall to the bottom of their run. The top run refills from above the board. In a run under a burning cell or block, new dots appear in place (they grow in) since nothing can fall through.
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
 - Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`) and `anchorDrops` (how many more anchors drop in). A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than the level started with (at least one), until drops run out. Anchor goals: `{ "type": "anchors", "count" }`.
-- Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
+- Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Ice hits are collected during the move (`Move.hitIce`) and applied together at the end of the cascade, after water, fire, and slime have reacted, so a hazard freed this move stays dormant for that move. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
 - Gems are placed with `pieces`: `{ "r", "c", "type": "gem", "color", "shape": "column" | "cross" }`. Gem goal: `{ "type": "gems", "count" }`. *(Row gems are added by the gems migration: `"shape": "row"`.)*
 - Ladybugs are placed with `pieces`: `{ "r", "c", "type": "ladybug", "color", "spots"? }` (spots default 3). Ladybug goal: `{ "type": "ladybugs", "count" }` counts ladybugs removed. *(The piece keeps the `ladybug` type name in code and level files; the original calls them Beetle Dots. The beetle migration adds `"facing": "up" | "down" | "left" | "right"`.)*
 - Level files may have `fire` (a grid: `.` or `x` burning; a burning cell's layout must be `.` and it can't hold a piece). Fire goal: `{ "type": "fire" }`; remaining = burning cells, including dormant ones under ice (frozen fire holds no dot).
@@ -118,6 +118,9 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 ### Ice
 - A layer on a cell, thickness 1–3, each with a distinct look (fresh, cracked, nearly broken). Ice does **not** lock the dot: the dot on an iced cell is connectable, falls out when the cells below clear, and is replaced from above like any other dot. Ice never blocks falling.
 - One hit = one clear on that cell, from any source: the dot used in a connection, a loop of the dot's color, a blast, a lotus, a power-up. Several clears on the cell in one move are several hits.
+- Each blast source that reaches an iced cell is one hit, whatever the cell holds, including an empty cell or frozen fire; two bombs in one wave reaching it are two hits `(default)`.
+- A hit on a ladybug on an iced cell is a clear on that cell: the ice takes a hit too `(default)`.
+- An adjacent clear does nothing to ice.
 - The goal counts cells broken all the way through.
 - Ice blocks water and slime from spreading onto it. Water, fire, or slime placed under ice by the level is dormant until the ice breaks `(default; the original only says ice contains them)`. Frozen fire holds no dot and can't be extinguished until the ice breaks.
 - A gem on an iced cell is protected: a trigger that reaches it hits the ice instead `(default)`. An anchor on an iced cell still sinks if it's on the bottom cell `(default; original undocumented)`.
@@ -242,7 +245,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 
 ## Build order
 
-Steps 1–7 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
+Steps 1–7 and 8.1 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
 
 1. Setup: PWA shell, rules module, test harness, config file, seeded RNG, and free static hosting (GitHub Pages or similar) so every working build can be opened on the phone.
 2. Core loop on one hardcoded board: drag, clear, gravity, refill, loops, bombs, moves, the collect-color goal, win/lose, auto-shuffle, colorblind symbols. Playtest on the phone until the feel is right before moving on.
@@ -270,6 +273,7 @@ Each is tagged `(default)` above. Revisit after playtesting; a change is a one-l
 - Refills can include the just-cleared color
 - Water floods the whole connected cleared set
 - Hazards placed under ice are dormant until the ice breaks; a frozen anchor on the bottom cell still sinks; a frozen gem is protected
+- Each blast source is one ice hit, even on a cell with no dot; a ladybug hit on ice also hits the ice
 - Fire and slime spread targets are a seeded pick among eligible neighbors; what fire spares beyond the documented list
 - Monster HP drops one per other dot in the connection; one per loop/color clear of its color; +1 per move it eats; what it won't eat
 - Lotus persists, doesn't fall, isn't connectable

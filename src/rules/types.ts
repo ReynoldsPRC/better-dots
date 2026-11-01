@@ -76,7 +76,7 @@ export type Goal =
 
 /** Per-cell layers, separate from the pieces. */
 export interface Layers {
-  /** Ice thickness, 0-3. A frozen cell's piece is locked in place and can't be connected. */
+  /** Ice thickness, 0-3. An overlay: the piece in it plays and falls normally; each clear on the cell is a hit. */
   ice: number[];
   /** Watered cells. Water under ice is dormant until the ice breaks. */
   water: boolean[];
@@ -203,7 +203,7 @@ export type MoveEvent = { board: Cells } & (
 
 /**
  * A power-up use. Neither costs a move.
- * - pick: on a frozen cell, knocks off one layer of ice; on a burning cell,
+ * - pick: on an iced cell, knocks off one layer of ice and leaves the dot; on a burning cell,
  *   puts the fire out; on a dot or ladybug, clears it; on a gem, sets it off.
  * - colorClear: clears every dot of the color as if a loop of it were made
  *   (so gems of that color go off), with no bombs since nothing is enclosed.

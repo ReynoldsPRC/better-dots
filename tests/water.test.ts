@@ -50,14 +50,20 @@ describe('water', () => {
   it('water under ice is dormant until the ice breaks', () => {
     const s = game(['1000', '2121', '1212'], { water: ['x...', '....', '....'], ice: ['2...', '....', '....'] });
     const first = applyMove(s, cells(s, [0, 1], [0, 2], [0, 3])).state;
-    // The ice cracked but holds; its water didn't spread.
-    expect(first.layers.ice[0]).toBe(1);
+    expect(first.layers.ice[0]).toBe(2);
     expect(wet(first)).toEqual(['x...', '....', '....']);
   });
 
+  it('does not flood an iced cell, even when its dot clears', () => {
+    const s = game(['1000', '2121', '1212'], { water: ['x...', '....', '....'], ice: ['.2..', '....', '....'] });
+    const { state } = applyMove(s, cells(s, [0, 1], [0, 2], [0, 3]));
+    expect(state.layers.ice[1]).toBe(1);
+    expect(wet(state)).toEqual(['x...', '....', '....']);
+  });
+
   it('once the ice breaks, that water spreads like any other', () => {
-    const s = game(['1000', '2233', '1212'], { water: ['x...', '....', '....'], ice: ['1...', '....', '....'] });
-    const broke = applyMove(s, cells(s, [0, 1], [0, 2], [0, 3])).state;
+    const s = game(['1100', '2233', '1212'], { water: ['x...', '....', '....'], ice: ['1...', '....', '....'] });
+    const broke = applyMove(s, cells(s, [0, 0], [0, 1])).state;
     expect(broke.layers.ice[0]).toBe(0);
     // The breaking move itself didn't flood: the water was still under ice while that line cleared.
     expect(wet(broke)[0]).toBe('x...');

@@ -69,7 +69,7 @@ export const config = {
     settleMs: 120,
     /** Shortest fall, so one-cell drops are still visible. */
     minMs: 90,
-    /** New dots under ice or fire can't fall in, so they grow in place over this long. */
+    /** New dots under fire can't fall in, so they grow in place over this long. */
     appearMs: 240,
   },
 
@@ -89,7 +89,7 @@ export const config = {
     radius: 0.2,
     /** Crack line width as a fraction of cell size. */
     crackWidth: 0.025,
-    /** Pause while ice cracks after a move. */
+    /** Pause while ice cracks (and other layers change) after a move. */
     crackMs: 220,
   },
 

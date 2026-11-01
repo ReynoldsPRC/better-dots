@@ -166,7 +166,7 @@ export function hasMove(s: GameState, cells: Cells = s.cells): boolean {
 
 /** Cells that never move: their pieces stay put and gravity stops at them. */
 function isFixed(s: GameState, i: number): boolean {
-  return s.layers.ice[i] > 0 || s.layers.fire[i];
+  return s.layers.fire[i];
 }
 
 function cloneLayers(l: Layers): Layers {
@@ -229,8 +229,8 @@ class Move {
   private nextWave: BlastSource[] = [];
   /** Cells whose piece was cleared this move (ice, water, fire, and slime react to these). */
   readonly cleared = new Set<number>();
-  /** Cells a blast reached, cleared or not. */
-  readonly blasted = new Set<number>();
+  /** Hits on iced cells this move, applied once the cascade ends. */
+  private readonly iceHits = new Map<number, number>();
 
   constructor(readonly s: GameState) {
     this.cells = s.cells.slice();
@@ -249,16 +249,28 @@ class Move {
     this.events.push({ ...e, board: this.cells.slice() } as MoveEvent);
   }
 
+  /** One hit on the ice over cell i, if there is any. */
+  hitIce(i: number): void {
+    if (this.layers.ice[i] > 0) this.iceHits.set(i, (this.iceHits.get(i) ?? 0) + 1);
+  }
+
   /**
-   * Clears one cell. Returns true if a piece was removed. Ice protects its
-   * piece; anchors only leave by sinking.
+   * Clears one cell. Returns true if a piece was removed. Anchors only leave
+   * by sinking; a gem on ice is protected. A clear on an iced cell hits the
+   * ice, unless `iceHit` is false (blasts hit ice per source instead).
    */
-  clear(i: number): boolean {
+  clear(i: number, iceHit = true): boolean {
     const p = this.cells[i];
-    if (!p || p.kind === 'anchor' || this.layers.ice[i] > 0) return false;
-    if (p.kind === 'ladybug') return this.hitLadybug(i, p);
+    if (!p || p.kind === 'anchor') return false;
+    if (p.kind === 'gem' && this.layers.ice[i] > 0) return false;
+    if (p.kind === 'ladybug') {
+      if (this.bugsHit.has(p.id)) return false;
+      if (iceHit) this.hitIce(i);
+      return this.hitLadybug(i, p);
+    }
     this.cells[i] = null;
     this.cleared.add(i);
+    if (iceHit) this.hitIce(i);
     if (p.kind === 'dot') this.tally.collected[p.color]++;
     return true;
   }
@@ -269,7 +281,6 @@ class Move {
    * Returns true if it was removed.
    */
   private hitLadybug(i: number, p: Extract<Piece, { kind: 'ladybug' }>): boolean {
-    if (this.bugsHit.has(p.id)) return false;
     this.bugsHit.add(p.id);
     this.cleared.add(i);
     if (p.spots <= 1 || this.bombCells.has(i)) {
@@ -292,7 +303,7 @@ class Move {
     const flying = this.cells.flatMap((p) => (p?.kind === 'ladybug' && this.toFly.has(p.id) ? [p.id] : []));
     for (const id of flying) {
       const i = this.cells.findIndex((p) => p?.id === id);
-      const spots = this.cells.flatMap((q, j) => (q?.kind === 'dot' && this.layers.ice[j] === 0 && j !== i ? [j] : []));
+      const spots = this.cells.flatMap((q, j) => (q?.kind === 'dot' && j !== i ? [j] : []));
       if (spots.length === 0) continue;
       const to = this.rng.pick(spots);
       [this.cells[i], this.cells[to]] = [this.cells[to], this.cells[i]];
@@ -314,12 +325,11 @@ class Move {
     const all = [...new Set(cells)].sort((a, b) => a - b);
     if (kind === 'blast') {
       for (const i of all) {
-        this.blasted.add(i);
         const src = this.trigger(i);
         if (src) this.nextWave.push(src);
       }
     }
-    const removed = all.filter((i) => this.clear(i));
+    const removed = all.filter((i) => this.clear(i, kind !== 'blast'));
     this.emit({ kind: 'clear', step: { kind, cells: removed, sources } });
   }
 
@@ -341,20 +351,23 @@ class Move {
    *   carries on through every connected cleared cell.
    * - Active fire next to a cleared cell goes out.
    * - Slime on a cleared cell is cleaned.
-   * - Ice loses one layer if a cell next to it was cleared or a blast reached it
-   *   (one layer per move at most). Hazards under it wake up from then on.
+   * - Ice loses one layer per hit this move: each clear on its cell and each
+   *   blast source reaching it. Hazards under it wake up from then on (water
+   *   and slime were still frozen while this move's cells cleared).
    */
   react(): void {
     const { s, layers } = this;
     const changed: number[] = [];
 
+    // Ice blocks water: an iced cell neither floods nor carries the flood on.
     const wet = (i: number) => layers.water[i] && layers.ice[i] === 0;
-    const queue = [...this.cleared].filter((i) => !layers.water[i] && orthogonal(s, i).some(wet));
+    const floodable = (i: number) => this.cleared.has(i) && !layers.water[i] && layers.ice[i] === 0;
+    const queue = [...this.cleared].filter((i) => floodable(i) && orthogonal(s, i).some(wet));
     const flooded = new Set(queue);
     while (queue.length > 0) {
       const i = queue.shift()!;
       for (const j of orthogonal(s, i)) {
-        if (this.cleared.has(j) && !layers.water[j] && !flooded.has(j)) {
+        if (floodable(j) && !flooded.has(j)) {
           flooded.add(j);
           queue.push(j);
         }
@@ -384,11 +397,8 @@ class Move {
       }
     }
 
-    for (let i = 0; i < layers.ice.length; i++) {
-      if (layers.ice[i] === 0) continue;
-      const near = this.blasted.has(i) || orthogonal(s, i).some((j) => this.cleared.has(j));
-      if (!near) continue;
-      layers.ice[i]--;
+    for (const [i, hits] of [...this.iceHits].sort((a, b) => a[0] - b[0])) {
+      layers.ice[i] = Math.max(0, layers.ice[i] - hits);
       if (layers.ice[i] === 0) this.tally.ice++;
       changed.push(i);
     }
@@ -400,16 +410,21 @@ class Move {
     const s = this.s;
     const view = this.view();
     const first = loop ? this.cells.flatMap((_, i) => (connectableColor(view, i) === color ? [i] : [])) : path;
-    // Dots and ladybugs enclosed by a loop that aren't its color become bombs (frozen ones are protected).
+    // Dots and ladybugs enclosed by a loop that aren't its color become bombs.
     const bombs = loop
       ? enclosedCells(s, path).filter((i) => {
           const k = this.cells[i]?.kind;
-          return (k === 'dot' || k === 'ladybug') && this.layers.ice[i] === 0 && !first.includes(i);
+          return (k === 'dot' || k === 'ladybug') && !first.includes(i);
         })
       : [];
-    // A loop sets off every gem of its color; they fire with the bombs.
+    // A loop sets off every gem of its color; they fire with the bombs. A frozen one's ice takes a hit instead.
     const gems = loop
-      ? this.cells.flatMap((p, i) => (p?.kind === 'gem' && p.color === color ? [this.trigger(i)!].filter(Boolean) : []))
+      ? this.cells.flatMap((p, i) => {
+          if (p?.kind !== 'gem' || p.color !== color) return [];
+          const src = this.trigger(i);
+          if (!src) this.hitIce(i);
+          return src ? [src] : [];
+        })
       : [];
     this.stage(loop ? 'loop' : 'line', first);
     this.waves([...bombs.map((cell): BlastSource => ({ cell, type: 'bomb' })), ...gems]);
@@ -420,7 +435,13 @@ class Move {
     let sources = start.slice().sort((a, b) => a.cell - b.cell);
     while (sources.length > 0) {
       const hit = new Set<number>();
-      for (const src of sources) for (const j of this.reach(src)) hit.add(j);
+      for (const src of sources) {
+        // Each source is one hit on any ice it reaches, whatever the cell holds.
+        for (const j of new Set(this.reach(src))) {
+          this.hitIce(j);
+          hit.add(j);
+        }
+      }
       this.nextWave = [];
       this.bombCells = new Set(sources.filter((x) => x.type === 'bomb').map((x) => x.cell));
       this.stage('blast', hit, sources);
@@ -472,9 +493,8 @@ class Move {
   /**
    * Gravity and refill. Each column splits into runs between fixed cells;
    * pieces fall to the bottom of their run, and empty tops refill. New pieces
-   * in the top run fall in from above the board. Under a frozen cell nothing
-   * refills: the gap waits until the ice breaks and the column can fall again.
-   * Under a burning cell new pieces appear in place.
+   * in the top run fall in from above the board; under a burning cell they
+   * appear in place. Ice never stops a fall.
    */
   fall(): void {
     const { cells, rng } = this;
@@ -483,7 +503,6 @@ class Move {
     for (let c = 0; c < s.cols; c++) {
       let run: number[] = [];
       let boundary = -1;
-      let underIce = false;
       const flush = () => {
         const pieces = run.map((i) => cells[i]).filter((p): p is Piece => p !== null);
         const empty = run.length - pieces.length;
@@ -491,7 +510,6 @@ class Move {
         run.forEach((i, k) => {
           if (k < empty) {
             cells[i] = null;
-            if (underIce) return;
             // From above the board in the top run; in place (they appear) under a fixed cell.
             const row = Math.floor(i / s.cols);
             slots.push({ i, startRow: boundary === -1 ? row - (lowestNew - boundary) : row, top: boundary === -1 });
@@ -507,7 +525,6 @@ class Move {
         if (isFixed(s, i)) {
           flush();
           boundary = r;
-          underIce = s.layers.ice[i] > 0;
         } else {
           run.push(i);
         }
@@ -536,14 +553,14 @@ class Move {
     this.emit({ kind: 'fall', spawnFrom });
   }
 
-  /** Falls, sinks anchors that reached the bottom (unless frozen there), and repeats until nothing sinks. */
+  /** Falls, sinks anchors that reached the bottom (ice or not), and repeats until nothing sinks. */
   settle(): void {
     for (let pass = 0; pass < 50; pass++) {
       this.fall();
       const sunk: number[] = [];
       for (let c = 0; c < this.s.cols; c++) {
         const b = this.bottomOf(c);
-        if (b >= 0 && this.cells[b]?.kind === 'anchor' && this.layers.ice[b] === 0) sunk.push(b);
+        if (b >= 0 && this.cells[b]?.kind === 'anchor') sunk.push(b);
       }
       if (sunk.length === 0) return;
       for (const i of sunk) this.cells[i] = null;

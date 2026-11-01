@@ -29,6 +29,15 @@ describe('ladybugs', () => {
     expect(result.steps[0].cells).toEqual(cells(s, [0, 0], [0, 2]));
   });
 
+  it('a hit on an iced cell also hits the ice, and a ladybug can land on ice', () => {
+    // The only dots left to land on are iced.
+    const s = game(['.0', '11'], { pieces: [bug(0, 0, 0)], ice: ['2.', '11'], colors: [0, 1, 2] });
+    const { state, result } = applyMove(s, cells(s, [0, 0], [0, 1]));
+    expect(state.layers.ice[at(s, 0, 0)]).toBe(1);
+    const fly = result.events.find((e) => e.kind === 'fly');
+    expect(fly?.kind === 'fly' && fly.moves[0].to).toBeGreaterThanOrEqual(at(s, 1, 0));
+  });
+
   it('removed on its last spot, counting toward the ladybug goal', () => {
     const s = game(['000', '121', '212'], { pieces: [bug(0, 1, 0, 1)], goals: [{ type: 'ladybugs', count: 1 }] });
     const { state } = applyMove(s, cells(s, [0, 0], [0, 1], [0, 2]));

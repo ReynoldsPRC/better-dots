@@ -27,7 +27,7 @@ Not missing: the Wikipedia claim that 13+ dots in a line clears the color appear
 
 | Mechanic | Original | Spec |
 | --- | --- | --- |
-| Ice | Overlay; the dot inside is connectable and falls through; 3 hits from using that dot or a square of its color; never blocks gravity | Locks the dot, plugs the column, cracked from neighbors, one layer per move. The original's locking variant is Glaciers (L2401, explosion-only). The spec's ice is a hybrid that exists in neither. |
+| Ice | Overlay; the dot inside is connectable and falls through; 3 hits from using that dot or a square of its color; never blocks gravity | *Migrated in step 8.1; now matches the original.* Was: locks the dot, plugs the column, cracked from neighbors, one layer per move. The original's locking variant is Glaciers (L2401, explosion-only). The old ice was a hybrid that exists in neither. |
 | Slime | 2 hits, by connecting the dot on the slime; spreads per region when that region isn't hit; spreads into empty cells; coexists with fire | 1 hit; global spread check; no overlap with fire |
 | Beetles / ladybugs | Walk one cell in their facing direction each move they're ignored, turning at walls; stay put when hit; leave a bomb on removal | Fly to a random cell when hit; no bomb; loop-enclosure kills them (that rule is the original's Monster rule) |
 | Fire | Per-region spread; bombs and gem beams extinguish it; it eats anchors (uncredited), wilds, lotus, nesting dots; enters water and slime | Global spread check; blasts don't extinguish; anchors safe; no overlap with water or slime |
@@ -91,7 +91,7 @@ Original:
 - Bombs, nesting-dot bombs, cloud zaps, gem beams each deal one hit; erasers and Color Burst deal only one hit; a square of wilds deals one hit to every hit-taking obstacle.
 - Doesn't block gravity. Blocks water and holds back slime. Fire can be trapped inside ice.
 
-Spec differs (the spec flags this as the player's preferred rule):
+Spec differed until step 8.1 (kept for history; the build now follows the original):
 
 - Spec ice locks the dot, makes it unconnectable, plugs the column, and is cracked from orthogonal neighbors, one layer per move regardless of neighbor count. Original ice is cracked from inside, as many times per move as the dot is involved, and never blocks falling.
 - The original's locking variant is Glaciers (L2401): trapped dots can't be connected, adjacency does nothing, only explosions hit them, 2 hits. The spec's ice is a hybrid of Ice (adjacent-ish, 1–3 layers) and Glacier (locks, immune to connection) that exists in neither.

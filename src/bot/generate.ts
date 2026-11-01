@@ -151,14 +151,14 @@ function placePieces(p: GenParams, layout: string[], palette: ColorId[], rng: Rn
   return out;
 }
 
-/** Mirrored ice; avoids the top row so new dots always have somewhere to land. */
+/** Mirrored ice. */
 function placeIce(p: GenParams, layout: string[], cells: number, rng: Rng): string[] | undefined {
   if (!p.ice || cells <= 0) return undefined;
   const grid = layout.map((row) => [...row].map(() => '.'));
   const [lo, hi] = p.ice.thickness;
   let placed = 0;
   for (let guard = 0; placed < cells && guard < 500; guard++) {
-    const r = 1 + rng.int(p.rows - 1);
+    const r = rng.int(p.rows);
     const c = rng.int(Math.ceil(p.cols / 2));
     const m = mirrorCol(p.cols, c);
     if (layout[r][c] === '-' || grid[r][c] !== '.') continue;

@@ -198,7 +198,7 @@ export class MoveAnimation {
           const fromR = from.get(piece.id)?.[0] ?? event.spawnFrom[piece.id] ?? toR;
           const ms = seg.fallMs!.get(piece.id) ?? 0;
           if (!from.has(piece.id) && fromR === toR) {
-            // Appearing in place (under ice or fire): grow in.
+            // Appearing in place (under fire): grow in.
             return [{ id: piece.id, piece, r: toR, c, scale: ease('easeOutCubic', lt / ms), alpha: 1 }];
           }
           let r = toR;

@@ -16,10 +16,10 @@ describe('pick', () => {
     expect(full(state)).toBe(true);
   });
 
-  it('a picked dot counts as a clear for its neighbors: next to ice, it cracks it', () => {
+  it('a picked dot next to ice leaves the ice alone', () => {
     const s = game(['012', '120', '200'], { ice: ['.2.', '...', '...'] });
     const { state } = applyPowerUp(s, { kind: 'pick', cell: at(s, 0, 0) });
-    expect(state.layers.ice[at(s, 0, 1)]).toBe(1);
+    expect(state.layers.ice[at(s, 0, 1)]).toBe(2);
   });
 
   it('on a frozen cell, knocks off one layer of ice and leaves the dot', () => {
@@ -92,14 +92,14 @@ describe('color clear', () => {
     expect(state.status).toBe('won');
   });
 
-  it('sets off gems of that color; frozen dots of it stay', () => {
+  it('sets off gems of that color; iced dots of it clear too, hitting their ice', () => {
     const s = game(['012', '120', '200'], {
       pieces: [{ r: 1, c: 2, type: 'gem', color: 1, shape: 'cross' }], ice: ['.2.', '...', '...'],
     });
     const { state, result } = applyPowerUp(s, { kind: 'colorClear', color: 1 });
     expect(result.steps.map((x) => x.kind)).toEqual(['loop', 'blast']);
-    expect(result.steps[0].cells).not.toContain(at(s, 0, 1));
-    expect(colorOf(state.cells[at(s, 0, 1)])).toBe(1);
+    expect(result.steps[0].cells).toContain(at(s, 0, 1));
+    expect(state.layers.ice[at(s, 0, 1)]).toBe(1);
   });
 
   it('only for the board\'s colors', () => {
