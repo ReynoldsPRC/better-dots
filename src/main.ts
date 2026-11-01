@@ -3,7 +3,7 @@ import { awardPowerUps, isUnlocked, recordWin, spendPowerUp, type SaveData } fro
 import { createGame, starsFor, type GameState, type LevelDef } from './rules';
 import { dotIcon, el } from './ui/dom';
 import { hideCard, showCard } from './ui/overlay';
-import { PlayScreen } from './ui/play';
+import { PlayScreen, type TargetPowerUp } from './ui/play';
 import { renderSelect } from './ui/select';
 import { exportSave, loadSave, pickSaveFile, storeSave } from './ui/storage';
 
@@ -39,7 +39,7 @@ const play = new PlayScreen(
       if (!devUnlock()) persist(spendPowerUp(save));
       renderPowerButton();
     },
-    pickingChanged: () => renderPowerButton(),
+    targetChanged: () => renderPowerButton(),
   },
 );
 
@@ -52,11 +52,15 @@ function powerUpsOnHand(): number {
 function renderPowerButton(): void {
   const btn = $('btn-power');
   const n = powerUpsOnHand();
-  btn.hidden = n < 1 && !play.isPicking;
-  btn.classList.toggle('armed', play.isPicking);
-  btn.textContent = play.isPicking ? '✕' : `✦ ${n === Infinity ? '∞' : n}`;
-  btn.setAttribute('aria-label', play.isPicking ? 'Cancel pick' : `Power-ups: ${n === Infinity ? 'unlimited' : n}`);
-  $('level-label').textContent = play.isPicking ? 'Tap a dot, ice, or fire to pick it' : levelLabel();
+  const aiming = play.targeting;
+  btn.hidden = n < 1 && !aiming;
+  btn.classList.toggle('armed', aiming !== null);
+  btn.textContent = aiming ? '✕' : `✦ ${n === Infinity ? '∞' : n}`;
+  btn.setAttribute('aria-label', aiming ? `Cancel ${POWER_NAMES[aiming]}` : `Power-ups: ${n === Infinity ? 'unlimited' : n}`);
+  $('level-label').textContent =
+    aiming === 'eraser' ? 'Tap a dot, ice, slime, or fire to erase'
+    : aiming === 'sureShot' ? 'Tap a cell to blast its row and column'
+    : levelLabel();
 }
 
 function levelLabel(): string {
@@ -64,24 +68,29 @@ function levelLabel(): string {
   return current.name ? `${current.label} · ${current.name}` : current.label;
 }
 
+const POWER_NAMES = { eraser: 'Eraser', sureShot: 'Sure Shot' } as const;
+
 function openPowerUps(): void {
-  if (play.isPicking) return play.setPicking(false);
+  if (play.targeting) return play.setTarget(null);
   if (powerUpsOnHand() < 1 || !play.ready()) return;
   const n = powerUpsOnHand();
   const cb = save.settings.colorblind;
+  const aim = (kind: TargetPowerUp) => () => { hideCard(); play.setTarget(kind); };
   showCard('Power-ups', [
     el('p', {}, n === Infinity ? 'Unlimited (developer switch). Using one costs no move.' : `You have ${n}. Using one costs no move.`),
-    el('h3', {}, 'Color clear'),
+    el('h3', {}, 'Color Burst'),
     el('div', { class: 'swatches' },
       ...play.game.colors.map((color) =>
         el('button', {
-          class: 'swatch', 'aria-label': `Clear color ${color + 1}`,
-          onClick: () => { hideCard(); play.usePowerUp({ kind: 'colorClear', color }); },
+          class: 'swatch', 'aria-label': `Color Burst: color ${color + 1}`,
+          onClick: () => { hideCard(); play.usePowerUp({ kind: 'colorBurst', color }); },
         }, dotIcon(color, cb, 30)),
       ),
     ),
   ], [
-    { label: 'Pick a dot or obstacle', primary: true, onClick: () => { hideCard(); play.setPicking(true); } },
+    { label: 'Eraser: one dot or obstacle', primary: true, onClick: aim('eraser') },
+    { label: 'Sure Shot: a row and column', onClick: aim('sureShot') },
+    { label: 'Shuffler: mix up the dots', onClick: () => { hideCard(); play.usePowerUp({ kind: 'shuffler' }); } },
     { label: 'Cancel', onClick: hideCard },
   ]);
 }

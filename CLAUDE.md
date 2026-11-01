@@ -222,8 +222,8 @@ Each one is introduced in its own world. Order follows the original's unlock ord
   - **Eraser:** remove one chosen dot. On ice or slime: one hit, the dot stays. On fire: puts it out. On a ladybug: one hit. On a nesting dot: clears it fully. On a gem: sets it off. On a cloud: removes it. Anchors, blocks, and empty cells can't be erased.
   - **Shuffler:** reshuffle the regular dots, as the stuck-board shuffle does.
   - **Color Burst:** clear every dot of a chosen color as if a loop of that color had been made (triggers gems and hits monsters, ladybugs, ice, slime of that color), but with no path, so nothing is enclosed and no bombs form.
-  - **Sure Shot:** tap a dot; its whole row and column are cleared as a blast (same effects as a cross gem's beams).
-  - All four count as clears for goals and obstacles, and the board settles and refills. Rules: `applyPowerUp` / `canUsePowerUp` in `game.ts`.
+  - **Sure Shot:** tap a dot; its whole row and column are cleared as a blast (same effects as a cross gem's beams). Any cell can be the target, since only its row and column matter `(default)`.
+  - All four count as clears for goals and obstacles, and the board settles and refills. Rules: `applyPowerUp` / `canUsePowerUp` in `game.ts` (kinds `eraser`, `colorBurst`, `shuffler`, `sureShot`). In the UI, Eraser and Sure Shot wait for a tap on the board (`PlayScreen.setTarget`); Shuffler and Color Burst act at once.
   - Earning (`awardPowerUps` in `progress.ts`, run after every win and on load): 1 the first time a level's best unassisted moves reach 3 stars at its current thresholds; 2 the first time every level of a world has an unassisted clear. The save lists awards given, so each is earned once. Candidates never earn. The developer switch makes power-ups unlimited for testing.
 
 ## Level creation
@@ -245,7 +245,7 @@ Each one is introduced in its own world. Order follows the original's unlock ord
 
 ## Build order
 
-Steps 1–7 and 8.1–8.6 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
+Steps 1–7 and 8.1–8.7 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
 
 1. Setup: PWA shell, rules module, test harness, config file, seeded RNG, and free static hosting (GitHub Pages or similar) so every working build can be opened on the phone.
 2. Core loop on one hardcoded board: drag, clear, gravity, refill, loops, bombs, moves, the collect-color goal, win/lose, auto-shuffle, colorblind symbols. Playtest on the phone until the feel is right before moving on.
@@ -283,4 +283,4 @@ Each is tagged `(default)` above. Revisit after playtesting; a change is a one-l
 - Teleported anchors don't sink at the pad
 - At most one new anchor drops per move
 - Train cars swap cargo with the cell ahead and reverse at track ends
-- Star cutoffs; power-ups cost no move
+- Star cutoffs; power-ups cost no move; Sure Shot can target any cell

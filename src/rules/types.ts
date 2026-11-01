@@ -214,13 +214,20 @@ export type MoveEvent = { board: Cells } & (
 );
 
 /**
- * A power-up use. Neither costs a move.
- * - pick: on an iced cell, knocks off one layer of ice and leaves the dot; on a burning cell,
- *   puts the fire out; on a dot or ladybug, clears it; on a gem, sets it off.
- * - colorClear: clears every dot of the color as if a loop of it were made
+ * A power-up use. None costs a move.
+ * - eraser: removes the dot on a cell. On an iced or slimed cell it's one hit
+ *   instead and the dot stays; on a burning cell it puts the fire out; on a
+ *   ladybug, one hit; on a gem, sets it off. Anchors and empty cells can't be erased.
+ * - colorBurst: clears every dot of the color as if a loop of it were made
  *   (so gems of that color go off), with no bombs since nothing is enclosed.
+ * - shuffler: reshuffles the regular dots, as a stuck board does.
+ * - sureShot: blasts the tapped cell's whole row and column, like a cross gem's beams.
  */
-export type PowerUp = { kind: 'pick'; cell: number } | { kind: 'colorClear'; color: ColorId };
+export type PowerUp =
+  | { kind: 'eraser'; cell: number }
+  | { kind: 'colorBurst'; color: ColorId }
+  | { kind: 'shuffler' }
+  | { kind: 'sureShot'; cell: number };
 
 export interface MoveResult {
   /** The line dragged (empty for a power-up). */

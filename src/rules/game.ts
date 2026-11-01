@@ -706,12 +706,20 @@ export function applyMove(s: GameState, path: readonly number[]): { state: GameS
   return finish(s, m, { path: path.slice(), color, loop, usesMove: true });
 }
 
+/** Regular dots a shuffle may move: not on burning cells. */
+function shufflable(s: GameState, cells: Cells = s.cells): number[] {
+  return cells.flatMap((p, i) => (p?.kind === 'dot' && !isFixed(s, i) ? [i] : []));
+}
+
 /** Can this power-up be used on this board right now? */
 export function canUsePowerUp(s: GameState, p: PowerUp): boolean {
   if (s.status !== 'playing') return false;
-  if (p.kind === 'colorClear') return s.colors.includes(p.color);
+  if (p.kind === 'colorBurst') return s.colors.includes(p.color);
+  if (p.kind === 'shuffler') return shufflable(s).length >= 2;
   const i = p.cell;
   if (!Number.isInteger(i) || i < 0 || i >= s.cells.length || !s.playable[i]) return false;
+  // Sure Shot can aim at any cell: it's the row and column that matter.
+  if (p.kind === 'sureShot') return true;
   if (s.layers.ice[i] > 0) return true;
   if (s.layers.fire[i]) return true;
   const k = s.cells[i]?.kind;
@@ -721,31 +729,42 @@ export function canUsePowerUp(s: GameState, p: PowerUp): boolean {
 /**
  * Uses a power-up. Costs no move and doesn't mark the attempt assisted. Its
  * clears count like any other (goals, ice, water, fire, slime, ladybugs), and
- * the board settles and refills, but hazards don't spread: it isn't a move.
- * Throws if it can't be used (see canUsePowerUp).
+ * the board settles and refills, but hazards don't spread and ladybugs don't
+ * walk: it isn't a move. Throws if it can't be used (see canUsePowerUp).
  */
 export function applyPowerUp(s: GameState, p: PowerUp): { state: GameState; result: MoveResult } {
   if (!canUsePowerUp(s, p)) throw new Error(`applyPowerUp: can't use ${JSON.stringify(p)} now`);
   const m = new Move(s);
   let color: ColorId = 0;
-  if (p.kind === 'colorClear') {
+  if (p.kind === 'shuffler') {
+    const spots = shufflable(s);
+    const dots = m.rng.shuffle(spots.map((i) => m.cells[i]));
+    spots.forEach((i, k) => (m.cells[i] = dots[k]));
+    const board = reshuffleUntilPlayable(s, m.cells, m.rng);
+    m.cells.splice(0, m.cells.length, ...board);
+    m.emit({ kind: 'shuffle' });
+    return finish(s, m, { path: [], color, loop: false, usesMove: false });
+  }
+  if (p.kind === 'colorBurst') {
     color = p.color;
     m.cascade([], color, true);
   } else {
     const i = p.cell;
     const piece = s.cells[i];
     if (piece && 'color' in piece) color = piece.color;
-    if (m.layers.ice[i] > 0 || m.layers.fire[i]) {
-      // One layer off the obstacle: ice before what's under it.
-      if (m.layers.ice[i] > 0) {
-        m.layers.ice[i]--;
-        if (m.layers.ice[i] === 0) m.tally.ice++;
-      } else {
-        m.layers.fire[i] = false;
-      }
+    if (p.kind === 'sureShot') {
+      m.waves([{ cell: i, type: 'cross', color }]);
+    } else if (m.layers.ice[i] > 0) {
+      // On ice: one hit, and the dot stays.
+      m.hitIce(i);
+    } else if (m.layers.fire[i]) {
+      m.layers.fire[i] = false;
       m.emit({ kind: 'layers', layers: cloneLayers(m.layers), cells: [i] });
     } else if (piece?.kind === 'gem') {
       m.waves([m.trigger(i)!]);
+    } else if (piece?.kind === 'dot' && m.layers.slime[i] > 0) {
+      // On slime: one hit, and the dot stays.
+      m.hitCell(i);
     } else {
       m.stage('line', [i]);
       m.waves([]);
@@ -753,7 +772,7 @@ export function applyPowerUp(s: GameState, p: PowerUp): { state: GameState; resu
   }
   m.react();
   m.settle();
-  return finish(s, m, { path: [], color, loop: p.kind === 'colorClear', usesMove: false });
+  return finish(s, m, { path: [], color, loop: p.kind === 'colorBurst', usesMove: false });
 }
 
 /**

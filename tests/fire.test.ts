@@ -68,7 +68,7 @@ describe('fire', () => {
     const s = game(['.12', '.21', '121', '.12'], {
       fire: ['x..', 'x..', '...', '...'], pieces: [{ r: 3, c: 0, type: 'gem', color: 0, shape: 'column' }],
     });
-    const { state } = applyPowerUp(s, { kind: 'pick', cell: at(s, 3, 0) });
+    const { state } = applyPowerUp(s, { kind: 'eraser', cell: at(s, 3, 0) });
     expect(burning(state)).toEqual([]);
   });
 

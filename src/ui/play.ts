@@ -16,9 +16,12 @@ export interface PlayHooks {
   colorblind(): boolean;
   /** A power-up was used (spend it). */
   powerUsed(): void;
-  /** Pick mode turned on or off. */
-  pickingChanged(on: boolean): void;
+  /** A power-up started or stopped waiting for a tap on the board. */
+  targetChanged(kind: TargetPowerUp | null): void;
 }
+
+/** The power-ups that are aimed at a cell. */
+export type TargetPowerUp = 'eraser' | 'sureShot';
 
 export class PlayScreen {
   private state!: GameState;
@@ -27,8 +30,8 @@ export class PlayScreen {
   private anim: MoveAnimation | null = null;
   private drag: (DragView & { pointerId: number; last: [number, number] }) | null = null;
   private raf = 0;
-  /** Pick mode: the next tap on the board picks that cell. */
-  private picking = false;
+  /** A power-up waiting for a tap: the next tap on the board aims it at that cell. */
+  private target: TargetPowerUp | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -49,7 +52,7 @@ export class PlayScreen {
     this.state = state;
     this.anim = null;
     this.drag = null;
-    this.setPicking(false);
+    this.setTarget(null);
     this.resize();
     this.renderHud();
   }
@@ -110,14 +113,14 @@ export class PlayScreen {
     return [e.clientX - rect.left, e.clientY - rect.top];
   }
 
-  get isPicking(): boolean {
-    return this.picking;
+  get targeting(): TargetPowerUp | null {
+    return this.target;
   }
 
-  setPicking(on: boolean): void {
-    if (this.picking === on) return;
-    this.picking = on;
-    this.hooks.pickingChanged(on);
+  setTarget(kind: TargetPowerUp | null): void {
+    if (this.target === kind) return;
+    this.target = kind;
+    this.hooks.targetChanged(kind);
   }
 
   /** Can a power-up be used right now (game on, no drag, last move landed)? */
@@ -147,9 +150,9 @@ export class PlayScreen {
     const pt = this.point(e);
     const cell = cellAt(this.layout, pt[0], pt[1]);
     if (cell === null) return;
-    if (this.picking) {
-      // Taps on cells a pick can't change are ignored; the button cancels.
-      if (this.usePowerUp({ kind: 'pick', cell })) this.setPicking(false);
+    if (this.target) {
+      // Taps on cells the power-up can't act on are ignored; the button cancels.
+      if (this.usePowerUp({ kind: this.target, cell })) this.setTarget(null);
       return;
     }
     const path = extendPath(this.state, [], cell);
