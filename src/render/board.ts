@@ -1,6 +1,6 @@
 // Draws the board: background, connection line, dots, and effects.
 import { config } from '../config';
-import { connectableColor, type ColorId, type GameState, type Layers, type Piece } from '../rules';
+import { connectableColor, type ColorId, type GameState, type GemShape, type Layers, type Piece } from '../rules';
 import type { Surface, Theme } from './canvas';
 import type { Frame, LayerChange, SpriteFrame } from './animation';
 import { ease } from './easing';
@@ -77,14 +77,14 @@ export function drawScene(
     ctx.stroke();
   }
 
-  // Gem beams, under the dots: a band along the column (and row, for cross gems) that narrows as it fades.
+  // Gem beams, under the dots: a band along the row, the column, or both, that narrows as it fades.
   for (const b of frame?.blasts ?? []) {
     if (b.type === 'bomb') continue;
     const [x, y] = toScreen(layout, b.r, b.c);
     const w = cell * config.gem.beamWidth * (1 - 0.6 * b.progress);
     ctx.fillStyle = withAlpha(colorOf(theme, b.color ?? 0), config.gem.beamAlpha * (1 - b.progress));
-    ctx.fillRect(x - w / 2, layout.y0, w, layout.rows * cell);
-    if (b.type === 'cross') ctx.fillRect(layout.x0, y - w / 2, layout.cols * cell, w);
+    if (b.type !== 'row') ctx.fillRect(x - w / 2, layout.y0, w, layout.rows * cell);
+    if (b.type !== 'column') ctx.fillRect(layout.x0, y - w / 2, layout.cols * cell, w);
   }
 
   // Dots. New dots slide in from above the board, so clip to its top edge.
@@ -381,7 +381,7 @@ export function drawPiece(ctx: CanvasRenderingContext2D, piece: Piece, x: number
     case 'anchor':
       return drawAnchor(ctx, x, y, r, config.ink[opts.theme]);
     case 'gem':
-      return drawGem(ctx, x, y, r, piece.color, piece.shape === 'cross', opts);
+      return drawGem(ctx, x, y, r, piece.color, piece.shape, opts);
     case 'ladybug':
       return drawLadybug(ctx, x, y, r, piece.color, piece.spots, opts);
   }
@@ -421,13 +421,14 @@ function drawLadybug(ctx: CanvasRenderingContext2D, x: number, y: number, r: num
 }
 
 /**
- * Gems: a tall bar (column gem) or a square (cross gem) in the gem's color,
- * with a pale inset and an etched line or cross showing which way it fires.
+ * Gems: a wide bar (row gem), a tall bar (column gem), or a square (cross
+ * gem) in the gem's color, with a pale inset and an etched line or cross
+ * showing which way it fires.
  */
-function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, cross: boolean, opts: DrawOptions) {
+function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, color: ColorId, shape: GemShape, opts: DrawOptions) {
   const s = r * config.gem.scale;
-  const w = cross ? s * 1.6 : s * 1.1;
-  const h = s * 1.6;
+  const w = shape === 'column' ? s * 1.1 : s * 1.6;
+  const h = shape === 'row' ? s * 1.1 : s * 1.6;
   ctx.save();
   ctx.fillStyle = colorOf(opts.theme, color);
   ctx.beginPath();
@@ -441,9 +442,11 @@ function drawGem(ctx: CanvasRenderingContext2D, x: number, y: number, r: number,
   ctx.lineWidth = s * 0.14;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(x, y - h / 2 + s * 0.3);
-  ctx.lineTo(x, y + h / 2 - s * 0.3);
-  if (cross) {
+  if (shape !== 'row') {
+    ctx.moveTo(x, y - h / 2 + s * 0.3);
+    ctx.lineTo(x, y + h / 2 - s * 0.3);
+  }
+  if (shape !== 'column') {
     ctx.moveTo(x - w / 2 + s * 0.3, y);
     ctx.lineTo(x + w / 2 - s * 0.3, y);
   }

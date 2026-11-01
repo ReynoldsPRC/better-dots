@@ -29,6 +29,24 @@ describe('gems', () => {
     expect(blast.cells).toEqual(cells(s, [0, 2], [1, 2], [2, 0], [2, 1], [2, 2], [2, 3], [3, 2]));
   });
 
+  it('a row gem clears its row', () => {
+    const s = game(['0011', '0022', '1213', '2121'], { pieces: [gem(2, 2, 0, 'row')] });
+    const { result } = applyMove(s, square(s));
+    const blast = result.steps.find((x) => x.kind === 'blast')!;
+    expect(blast.sources).toEqual([{ cell: at(s, 2, 2), type: 'row', color: 0 }]);
+    expect(blast.cells).toEqual(cells(s, [2, 0], [2, 1], [2, 2], [2, 3]));
+  });
+
+  it('a beam destroys an anchor it crosses, and counts it', () => {
+    // The anchor isn't at the bottom and nothing under it clears, so only the beam can take it.
+    const s = game(['0011', '0022', '1213', '2121'], {
+      pieces: [gem(2, 1, 0, 'row'), { r: 2, c: 3, type: 'anchor' }], goals: [{ type: 'anchors', count: 1 }],
+    });
+    const { state, result } = applyMove(s, square(s));
+    expect(result.steps.find((x) => x.kind === 'blast')!.cells).toContain(at(s, 2, 3));
+    expect(state.goals[0].progress).toBe(1);
+  });
+
   it('a loop of another color leaves it alone', () => {
     const s = game(['0011', '0022', '1213', '2121'], { pieces: [gem(1, 2, 1, 'column')] });
     const { result } = applyMove(s, square(s));
@@ -80,8 +98,8 @@ describe('gems', () => {
 
   it('level files: gems and gem goals are checked', () => {
     const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'] };
-    const ok = parseLevel({ ...base, pieces: [gem(0, 0, 1, 'cross')], goals: [{ type: 'gems', count: 1 }] }, 'x');
-    expect(ok.pieces).toEqual([gem(0, 0, 1, 'cross')]);
+    const ok = parseLevel({ ...base, pieces: [gem(0, 0, 1, 'cross'), gem(0, 1, 1, 'row')], goals: [{ type: 'gems', count: 1 }] }, 'x');
+    expect(ok.pieces).toEqual([gem(0, 0, 1, 'cross'), gem(0, 1, 1, 'row')]);
     expect(() => parseLevel({ ...base, pieces: [gem(0, 0, 3, 'cross')], goals: [{ type: 'gems', count: 1 }] }, 'x')).toThrow(/gem color/);
     expect(() => parseLevel({ ...base, pieces: [{ ...gem(0, 0, 1, 'cross'), shape: 'star' }], goals: [{ type: 'gems', count: 1 }] }, 'x')).toThrow(/shape/);
     expect(() => parseLevel({ ...base, pieces: [gem(0, 0, 1, 'cross')], goals: [{ type: 'gems', count: 2 }] }, 'x')).toThrow(/only has 1/);

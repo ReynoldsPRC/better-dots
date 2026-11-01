@@ -374,8 +374,8 @@ class Move {
     const c = src.cell % s.cols;
     if (src.type === 'bomb') return [src.cell, ...cellsAround(s, src.cell, s.bombRadius)];
     const out: number[] = [];
-    for (let rr = 0; rr < s.rows; rr++) out.push(rr * s.cols + c);
-    if (src.type === 'cross') for (let cc = 0; cc < s.cols; cc++) out.push(r * s.cols + cc);
+    if (src.type !== 'row') for (let rr = 0; rr < s.rows; rr++) out.push(rr * s.cols + c);
+    if (src.type !== 'column') for (let cc = 0; cc < s.cols; cc++) out.push(r * s.cols + cc);
     return out.filter((i) => s.playable[i]);
   }
 

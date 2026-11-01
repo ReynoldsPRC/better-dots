@@ -19,12 +19,12 @@ export interface Anchor {
   id: number;
 }
 
-export type GemShape = 'column' | 'cross';
+export type GemShape = 'row' | 'column' | 'cross';
 
 /**
  * Not connectable; falls. Goes off when a loop of its color is made, or when
- * a blast or beam reaches it: a column gem clears its column, a cross gem its
- * row and column.
+ * a blast or beam reaches it: a row gem clears its row, a column gem its
+ * column, a cross gem both.
  */
 export interface Gem {
   kind: 'gem';

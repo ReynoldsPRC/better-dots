@@ -22,7 +22,7 @@ export interface GenParams {
    * in the given range; the goal is to break it all.
    */
   ice?: { perSize: number; max: number; thickness: [number, number] };
-  /** Gem goal: this many gems (a share of them cross gems) in the board's colors; set them all off. */
+  /** Gem goal: this many gems (a share of them cross gems, the rest row or column evenly) in the board's colors; set them all off. */
   gems?: { count: number; crossShare: number };
   /** Slime goal: this many slimed cells to start (mirrored), `underIce` of them frozen over. */
   slime?: { cells: number; underIce?: number };
@@ -136,7 +136,7 @@ function placePieces(p: GenParams, layout: string[], palette: ColorId[], rng: Rn
     const c = rng.int(p.cols);
     if (!free(r, c)) continue;
     taken.add(r * p.cols + c);
-    const shape = rng.float() < p.gems!.crossShare ? 'cross' : 'column';
+    const shape = rng.float() < p.gems!.crossShare ? 'cross' : rng.float() < 0.5 ? 'row' : 'column';
     out.push({ r, c, type: 'gem', color: palette[k % palette.length], shape });
     k++;
   }

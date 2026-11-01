@@ -1,6 +1,6 @@
 // Level data: checks a parsed level file and scores a finished attempt.
 import { config } from '../config';
-import { MAX_COLORS, type ColorId, type Goal, type LevelDef, type PlacedPiece, type Wall } from './types';
+import { MAX_COLORS, type ColorId, type GemShape, type Goal, type LevelDef, type PlacedPiece, type Wall } from './types';
 
 const isInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v);
 const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLORS;
@@ -133,8 +133,8 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
           return { r, c, type: 'anchor' };
         case 'gem':
           if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: gem color must be one of "colors"`);
-          if (po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "column" or "cross"`);
-          return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as 'column' | 'cross' };
+          if (po.shape !== 'row' && po.shape !== 'column' && po.shape !== 'cross') fail(`piece ${k}: gem shape must be "row", "column", or "cross"`);
+          return { r, c, type: 'gem', color: po.color as ColorId, shape: po.shape as GemShape };
         case 'ladybug': {
           if (!isColor(po.color) || !(colors as number[]).includes(po.color)) fail(`piece ${k}: ladybug color must be one of "colors"`);
           if (po.spots !== undefined && !(isInt(po.spots) && po.spots >= 1 && po.spots <= 3)) fail(`piece ${k}: ladybug spots must be 1-3`);
