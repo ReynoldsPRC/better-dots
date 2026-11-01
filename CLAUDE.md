@@ -1,12 +1,13 @@
 # better dots
 
-A personal puzzle game for one player, inspired by early Two Dots, minus everything built to monetize attention. This file is the spec and the source of truth. When a decision changes, update this file in the same commit.
+A personal puzzle game for one player: Two Dots with the original's mechanics and none of the machinery built to monetize attention. This file is the spec and the source of truth. When a decision changes, update this file in the same commit.
 
 ## What it is
 
 - A web app (installable PWA) played in a phone browser, added to the home screen, fully offline. Portrait, one-handed.
 - Single player. No backend, no network calls at runtime.
 - Its own visual identity: don't copy Two Dots art, icons, or branding.
+- **Rules follow the original Two Dots.** `docs/two-dots-reference.md` documents how the original's mechanics work (official tutorial text plus player guides). When this file and the reference disagree, this file wins; when this file is silent, the reference is the tiebreaker; when both are silent, pick the simplest rule, write it here, and tag it `(default)`. `docs/decisions.md` records every place this game deliberately differs from the original and why. Don't "fix" a documented deviation back toward the original without a decision entry.
 
 ## Never
 
@@ -19,13 +20,14 @@ Non-negotiable. Don't add any of these, even as an option:
 - Random reward boxes. Power-ups come only from the fixed triggers below.
 - Daily rewards, streaks, push notifications, "come back" prompts
 - Accounts, online features, leaderboards, analytics, tracking. All data stays on the device.
+- Pre-level consumable boosters (the original's Booster Boxes / Supply Crates). The in-level power-ups are enough.
 
 ## Tech and working rules
 
 - Plain web stack, no game engine: TypeScript, Vite, Vitest.
 - **Rendering: Canvas 2D.** Chosen over SVG because every frame redraws a few dozen dots in motion (falls, settles, pops, cascades) plus a line that tracks the finger. One immediate-mode canvas sized to devicePixelRatio stays smooth on a phone. SVG would mean diffing many DOM nodes per frame for no benefit, since nothing on the board needs to be a DOM element.
 - Game rules live in a pure module with no DOM or rendering code. Rendering and input are separate layers that read rule state.
-- Rules are deterministic given a seed (seeded RNG for refills, ladybug flights, shuffles). Same level + seed + moves = same result. This is required for tests, the bot, and reproducing bugs.
+- Rules are deterministic given a seed (seeded RNG for refills, hazard spread targets, beetle color changes, monster moves, shuffles). Same level + seed + moves = same result. This is required for tests, the bot, and reproducing bugs.
 - Every rule has unit tests. Run the full suite after every change. A change that breaks an earlier mechanic isn't done.
 - All feel parameters (fall speed, easing, bounce, line thickness, animation timings, bomb radius, etc.) live in one config file so they can be tuned without touching logic. The player will describe feel problems in plain language ("too floaty," "the snap is late"); translate those into config changes.
 - Levels are JSON data files, not code.
@@ -36,18 +38,20 @@ Non-negotiable. Don't add any of these, even as an option:
 
 ### Layout and commands
 
+The notes in this subsection describe the code as built. Where a rule below changes, update the matching note in the same commit.
+
 - `src/rules/`: pure rules (no DOM, clock, or `Math.random`; `tests/rules-purity.test.ts` enforces this). `src/rules/rng.ts` is the seeded RNG: state is a single 32-bit int, so it can be stored in rule state.
 - `src/rules/`: `types.ts` (state shapes), `board.ts` (grid geometry), `path.ts` (dragging, loops, enclosure), `game.ts` (setup, moves, gravity, refill, reshuffle, goals). A move returns the new state plus a `MoveResult` whose `events` list what happened in order (`clear` stages, `fall`, `sink`, `shuffle`, ...), each with the board after it. `src/render/animation.ts` replays that list, so a new mechanic adds an event kind and a way to draw it.
-- Gravity works per column in runs between fixed cells (frozen or burning cells). Pieces fall to the bottom of their run. The top run refills from above the board. A run under a frozen cell doesn't refill at all: its pieces settle to the bottom and the gap under the ice stays empty until the ice breaks and the column falls again. In a run under a burning cell, new dots appear in place (they grow in) since nothing can fall through.
+- Gravity works per column in runs between fixed cells (currently frozen or burning cells; after the ice migration, burning cells and blocks). Pieces fall to the bottom of their run. The top run refills from above the board. In a run under a burning cell or block, new dots appear in place (they grow in) since nothing can fall through. *(Current code: a run under a frozen cell doesn't refill, and the gap under the ice stays empty until the ice breaks. That behavior goes away with the ice migration; ice no longer blocks falling.)*
 - `src/render/`: canvas drawing (`board.ts`), layout and hit-testing (`layout.ts`), the per-move animation timeline (`animation.ts`). `src/ui/`: DOM screens, HUD, overlays, and touch input (`play.ts`). `src/main.ts`: wiring. `src/config.ts`: all feel parameters.
 - Level files may also have `pieces` (`[{ "r", "c", "type": "anchor" }]`) and `anchorDrops` (how many more anchors drop in). A new anchor drops into the top of a seeded column whenever fewer anchors are on the board than the level started with (at least one), until drops run out. Anchor goals: `{ "type": "anchors", "count" }`.
 - Level files may have `ice` (a grid like `layout`: `.` none, `1`-`3` thickness). Ice goal: `{ "type": "ice", "count" }` counts cells broken all the way through. Cell layers live in `state.layers`; a `layers` move event carries changes so the renderer can show them at the right moment.
-- Gems are placed with `pieces`: `{ "r", "c", "type": "gem", "color", "shape": "column" | "cross" }`. Gem goal: `{ "type": "gems", "count" }`.
-- Ladybugs are placed with `pieces`: `{ "r", "c", "type": "ladybug", "color", "spots"? }` (spots default 3). Ladybug goal: `{ "type": "ladybugs", "count" }` counts ladybugs removed.
+- Gems are placed with `pieces`: `{ "r", "c", "type": "gem", "color", "shape": "column" | "cross" }`. Gem goal: `{ "type": "gems", "count" }`. *(Row gems are added by the gems migration: `"shape": "row"`.)*
+- Ladybugs are placed with `pieces`: `{ "r", "c", "type": "ladybug", "color", "spots"? }` (spots default 3). Ladybug goal: `{ "type": "ladybugs", "count" }` counts ladybugs removed. *(The piece keeps the `ladybug` type name in code and level files; the original calls them Beetle Dots. The beetle migration adds `"facing": "up" | "down" | "left" | "right"`.)*
 - Level files may have `fire` (a grid: `.` or `x` burning; a burning cell's layout must be `.` and it can't hold a piece). Fire goal: `{ "type": "fire" }`; remaining = burning cells, including dormant ones under ice (frozen fire holds no dot).
-- Level files may have `slime` (a grid: `.` clean, `x` slimed). Slime goal: `{ "type": "slime" }`; remaining = slimed cells, including dormant ones under ice.
+- Level files may have `slime` (a grid: `.` clean, `x` slimed). Slime goal: `{ "type": "slime" }`; remaining = slimed cells, including dormant ones under ice. *(The slime migration makes the grid `.`, `1`, `2` for hits remaining; `x` means 2.)*
 - Level files may have `water` (a grid: `.` dry, `x` watered). Flood goal: `{ "type": "flood" }`. Water under ice is dormant: it doesn't spread until the ice breaks, and a move that breaks the ice doesn't flood from it (the water was still frozen while that move's cells cleared).
-- `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). A level's `label` (`N-NN`, or `cN-K` for candidates) comes from that position and is what the player sees; its `id` is a stable field in the file, and saves are keyed on it, so renumbering never moves progress between levels. `src/levels.ts` bundles them at build time (duplicate ids are an error); `tests/level.test.ts` checks every shipped file. Unknown keys anywhere in a level file are an error. Level file fields: `id` (required, 6-12 lowercase letters or digits; `npm run levels -- ids` mints 8-char random ones for files without), `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot, `-` no cell), `walls` (optional list of `{ "r", "c", "side": "up" | "down" | "left" | "right" }`, each between two cells), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
+- `levels/world-N/world.json` (`{ "name": ... }`) and `levels/world-N/NN.json` (01, 02, ... with no gaps). A level's `label` (`N-NN`, or `cN-K` for candidates) comes from that position and is what the player sees; its `id` is a stable field in the file, and saves are keyed on it, so renumbering never moves progress between levels. `src/levels.ts` bundles them at build time (duplicate ids are an error); `tests/level.test.ts` checks every shipped file. Unknown keys anywhere in a level file are an error. Level file fields: `id` (required, 6-12 lowercase letters or digits; `npm run levels -- ids` mints 8-char random ones for files without), `name` (optional), `seed` (fixes the opening board), `moves`, `colors` (palette ids 0-4), `layout` (row strings: `.` random dot, `0`-`4` a fixed dot, `-` no cell), `walls` (optional list of `{ "r", "c", "side": "up" | "down" | "left" | "right" }`, each between two cells; legacy, see Board terrain), `goals` (`{ "type": "collect", "color", "count" }`), `stars` (optional `{ "two", "three" }`: most moves used that still earns 2 or 3 stars; until the bot sets them, `config.stars` fallback fractions of the move limit apply).
 - `src/progress.ts`: save format (version 2: records keyed on level id, holding best moves and the assisted mark; plus `powerUps` on hand and `awarded` level ids and world numbers) and unlock bookkeeping (pure). Version 1 saves (keyed on labels, with stored stars) migrate on load through a label-to-id table; records with no matching level are dropped. `src/ui/storage.ts`: localStorage key `better-dots-save`, export/import as a JSON file from Settings. Developer switch: Settings toggle, or `?dev` in the URL.
 - Worlds 1-3 (core, shaped boards, walls) were hand-made, then scored by the bot.
 - `src/bot/`: pure and seeded like the rules (the purity test covers it). `bot.ts` plays randomized greedy with a short lookahead: per same-color group it proposes up to 4 distinct loops (from the DFS's non-tree edges, ranked by how many other-color dots and ladybugs they enclose, then by gems those bombs would reach), the longest line it finds, and lines from target cells; it simulates each with `applyMove` and scores by goal progress (each goal normalized by its starting size) plus small mechanic-specific nudges. Noise is in units of one item of the largest goal and stays below one unit (default 0.2), so it only breaks near-ties. The top 3 candidates are then rescored with 0.5 × the best reply's score (no noise, half the search budget). `generate.ts` builds candidates from `presets.ts` (one preset per world, ramping easy to hard across a batch) and sizes goals so the bot's needs land in the preset's move range. `format.ts` writes level JSON in a stable style.
@@ -58,104 +62,165 @@ Non-negotiable. Don't add any of these, even as an option:
 - Dev builds expose the play screen as `window.__play` for console poking.
 - `public/sw.js`: service worker (network-first for the page, cache-first for hashed assets; `VERSION` is stamped with the short git SHA at build by a plugin in `vite.config.ts`, so old caches are evicted on the next load). `public/manifest.webmanifest`. Icons come from `npm run icons`.
 - `npm test`, `npm run dev`, `npm run phone` (dev server on the LAN), `npm run build`.
-- Hosting: GitHub Pages via `.github/workflows/deploy.yml`, served at https://2by6vk6424.github.io/better-dots/ (repo `2by6vk6424/better-dots`). Every push to `main` runs the tests, builds, and deploys. The build uses relative paths (`base: './'`), so it works under the repo subpath.
+- Hosting: GitHub Pages via `.github/workflows/deploy.yml`. Every push to `main` runs the tests, builds, and deploys. The build uses relative paths (`base: './'`), so it works under the repo subpath.
+
+## Vocabulary
+
+- **Clear:** a cell's dot being removed by any means (line, loop, bomb, beam, zap, lotus, power-up). Every clear counts the same for goals and for obstacles.
+- **Hit:** one unit of damage to an obstacle. Each obstacle below says what delivers a hit to it. The common kinds:
+  - **adjacent clear:** a cell orthogonally next to the obstacle is cleared. One connection that clears several adjacent cells is still one hit; two separate clear events (a line, then a bomb) are two hits.
+  - **clear on it:** the dot sitting on or inside the obstacle is cleared (ice, slime, circuits, targets work this way).
+  - **blast:** a bomb explosion, a gem beam, a cloud zap, or a nesting-dot bomb reaching the cell. Each blast source is one hit.
+- **Blast sources** (things that emit hits on cells): bombs from loops, nesting-dot bombs, beetle bombs, gem beams, cloud zaps, magnet explosions, circuit discharges, monster-kills by bomb. The Sure Shot power-up is a blast; Eraser and Color Burst are not (they deliver one hit to what they touch, as a clear).
 
 ## Core rules
 
 - **Board:** a grid of cells; some cells may be empty (shaped boards). Up to 5 dot colors per board, set per level.
 - **Move:** drag across 2 or more adjacent dots of the same color, horizontally or vertically, never diagonally. Dragging back along the line shortens it. Releasing clears the line and uses one move.
-- **Gravity and refill:** after a clear, dots fall straight down to fill gaps, passing over empty cells. New dots enter at the top of each column. Refills may include the color just cleared.
-- **Loops:** if the line closes a loop, every dot of that color on the board clears. Any closed loop counts, not only 2×2 squares.
-- **Bombs:** dots of other colors enclosed inside a loop become bombs. They explode, clearing themselves and the surrounding cells (default: the 8 neighbors).
-- **Clears are clears:** every way of clearing a cell (line, loop, bomb, gem beam, power-up) counts the same for obstacle interactions and goal progress.
-- **Chain resolution:** explosions and beams can trigger further bombs and gems. Resolve in a fixed, deterministic order and animate the cascade in sequence so it reads clearly.
+- **Gravity and refill:** after a clear, dots fall straight down to fill gaps, passing over empty cells. New dots enter at the top of each column. Refills are seeded random from the level's colors and may include the color just cleared `(default; one 2014 source claims the refill after a loop excludes that color, unconfirmed)`.
+- **Loops:** if the line closes a loop, every dot of that color on the board clears. Any closed loop of 4+ dots counts, not only 2×2 squares.
+- **Bombs:** dots of other colors fully enclosed inside a loop become bombs. They explode in place, after the loop's color clear and before gravity, clearing themselves and their 8 neighbors.
+- **Chain resolution:** blasts can trigger further bombs, gems, and obstacle reactions. Resolve in waves in a fixed, deterministic order (everything set off together fires together; what a wave reaches fires in the next wave) and animate the cascade in sequence so it reads clearly.
 - **Moves and goals:** each level has a move limit and one or more goals. Meet all goals before moves run out to win.
-- **Stuck board:** if no legal move exists, reshuffle the regular dots automatically. Free, costs no move. Obstacles stay put. At the start only the randomly filled cells are shuffled; dots the level placed stay put. A level whose placed dots leave no opening move is an error.
+- **Stuck board:** if no legal move exists, reshuffle the regular dots automatically. Free, costs no move. Obstacles, wilds, and placed pieces stay put. At the start only the randomly filled cells are shuffled; dots the level placed stay put. A level whose placed dots leave no opening move is an error.
+- **Order of a move:** (1) the connection's clears, including the loop's color clear; (2) bombs and triggered gems, in waves, with obstacle hits applied as each wave lands; (3) layer reactions that happen "on clear" (ice hits, slime hits, water spread, fire extinguished); (4) pieces that act after the cascade (beetle bombs, lotus auto-connect, monster kills); (5) gravity and refill; (6) things that react to the settled board (cloud zaps, teleporter transfers happen during the fall); (7) things that act when ignored (fire and slime spread, beetles walk, monsters eat, trains advance); (8) a second settle if step 7 moved anything. Steps 7 and 8 don't happen for power-up uses, since no move was spent. Any mechanic that needs a different slot says so below.
+- **Leftover moves:** when the last goal is met with moves to spare, the first 5 unused moves drop as bombs onto seeded random dots, one at a time, each exploding before the next lands. Purely a finale; it changes no record.
+- **Square hint:** an optional setting (off by default) highlights one available loop on the board after a few seconds of no input.
 
 ## Board terrain
 
-- **Walls:** barriers on cell edges. Connections can't cross a wall. Default: walls don't affect falling.
 - **Shaped boards:** empty cells; dots fall past them.
-- **Later:** ramps that feed dots in from the side, diagonal falling.
+- **Blocks:** a full cell that holds no dot, can't be connected across, stops dots from falling (the column refills below it by growing in), and contains spreading hazards and walking pieces. Removed by one adjacent clear or one blast. Blocks block water. Level data: `blocks` grid.
+- **One-sided blocks:** a block with one weak side. Removed only by an adjacent clear on the weak side, or by any blast from any side. Otherwise as a block. Level data: `{ "r", "c", "weak": "up" | "down" | "left" | "right" }`.
+- **Teleporters:** a bottom pad in one column linked to a top pad in another. A dot or piece that falls into a bottom pad leaves the board there and enters at the linked top pad, continuing to fall. Transfers happen during gravity, pulled by space in the receiving column. Pairings are explicit in level data and are drawn so the player can trace them; chains are allowed. Connections don't cross a teleporter. An anchor reaching a bottom pad transfers; it doesn't sink `(default)`.
+- **Walls (legacy):** thin barriers on cell edges that block connections but not falling. The original has no such thing; the shipped World 3 uses them. Keep them working, but no new levels use them and the generator never places them. See `docs/decisions.md`.
+- **Later:** ramps (triangular half-cells that slide a falling dot one column sideways; dots arriving down a ramp fill a gap before dots directly above it), side feeds.
 
 ## Obstacles and special pieces
 
-Each one is introduced in its own world (see Build order).
+Each one is introduced in its own world. Order follows the original's unlock order; built mechanics keep their existing worlds.
+
+### Water
+- A cell layer. Some cells start watered. Dots on water play normally.
+- When a cleared cell is orthogonally adjacent to a watered cell, it becomes watered, and the flood carries on through every cleared cell connected to it `(default; the original's flood extent is undocumented)`. Any clear counts: lines, loops, blasts, lotus, power-ups.
+- Flooding happens after the move's whole cascade, before gravity, on the vacated cells.
+- Blocked by ice, blocks, one-sided blocks, trapdoors, and slime. Water blocks slime. Fire can spread onto a watered cell; the cell stays watered.
+- Goal: flood every playable cell.
 
 ### Anchors
 - Not connectable. Fall with gravity like dots.
-- Sink when they reach the bottom of their column (its lowest cell, even on shaped boards): removed and counted toward the anchor goal. A frozen anchor on the bottom cell doesn't sink until its ice breaks (ice protects).
-- Bombs and beams don't affect anchors, and a loop around an anchor doesn't make it a bomb. Anchors only leave by sinking. Reshuffles leave them in place.
-- Level data sets the starting anchors and how many more can drop in from the top.
+- Sink when they reach the bottom of their column (its lowest cell, even on shaped boards): removed and counted toward the anchor goal.
+- **Blasts destroy anchors and count** toward the anchor goal. A loop around an anchor doesn't make it a bomb and does nothing to it.
+- Fire spreading onto an anchor, or a monster eating one, destroys it **without** credit.
+- Anchors travel through teleporters; beetles swap places with them; slime can cover the cell under one.
+- Spawning: a new anchor drops into the top of a seeded column whenever fewer anchors are on the board than `maxOnBoard` (default: the starting count, at least 1), after `dropDelay` moves (default 0), until drops run out. Level data: `anchorDrops`, optional `maxOnBoard`, optional `dropDelay`.
 
 ### Ice
-- Sits on a cell and locks that cell's dot in place. Frozen dots don't fall, dots above stack on them, and frozen dots can't be part of a connection.
-- The frozen dot plugs its column: when dots below it clear, the dots under it fall to fill the gaps, but nothing replaces them from above, so empty cells collect right under the ice. When the ice breaks, the freed dot and everything above it fall into the gap and the top of the column refills.
-- Broken from the edges: each move that clears at least one cell orthogonally adjacent to the ice removes one layer (default: one layer per move, no matter how many neighbors clear).
-- Thickness 1–3, each with a distinct look (fresh, cracked, nearly broken). Levels can place ice at any thickness.
-- When it breaks, the dot is freed, and anything under the ice (water, fire, slime) activates from that move on.
-- Ice protects its dot completely: a loop of that color leaves it, it doesn't become a bomb inside a loop, and blasts don't clear it. A blast reaching a frozen cell counts like a neighboring clear (one layer, still at most one per move). Neighbors are orthogonal; walls don't shield ice.
-- This is the player's preferred rule; the original may have worked differently. Revisit if it feels wrong in playtesting.
-
-### Water
-- A cell layer. Some cells start watered.
-- When a cleared cell is orthogonally adjacent to a watered cell, it becomes watered. Default: resolve along the whole cleared set, so a line that touches water floods its full length.
-- Goal: flood every playable cell.
-- Flooding happens after the move's whole cascade: any cleared cell orthogonally touching active water floods, then the flood carries on through every cleared cell connected to it.
+- A layer on a cell, thickness 1–3, each with a distinct look (fresh, cracked, nearly broken). Ice does **not** lock the dot: the dot on an iced cell is connectable, falls out when the cells below clear, and is replaced from above like any other dot. Ice never blocks falling.
+- One hit = one clear on that cell, from any source: the dot used in a connection, a loop of the dot's color, a blast, a lotus, a power-up. Several clears on the cell in one move are several hits.
+- The goal counts cells broken all the way through.
+- Ice blocks water and slime from spreading onto it. Water, fire, or slime placed under ice by the level is dormant until the ice breaks `(default; the original only says ice contains them)`. Frozen fire holds no dot and can't be extinguished until the ice breaks.
+- A gem on an iced cell is protected: a trigger that reaches it hits the ice instead `(default)`. An anchor on an iced cell still sinks if it's on the bottom cell `(default; original undocumented)`.
 
 ### Fire
-- Burning cells hold no dot. Default: dots don't fall through them.
-- Extinguish a burning cell by clearing a cell orthogonally adjacent to it. It becomes a normal cell and refills.
-- Each move in which no fire is extinguished, fire spreads to one adjacent cell, destroying its dot. It doesn't spread onto watered or slimed cells (hazards don't overlap).
-- Putting out fire happens with the other layer reactions right after the cascade, so the cell refills in the same move. Spreading happens after the board settles, to a seeded pick among unfrozen, non-burning cells orthogonally next to active fire that hold a regular dot or nothing (anchors, gems, and ladybugs are safe). The destroyed dot doesn't count toward goals. A blast landing on a burning cell doesn't put it out; clearing a neighbor does. Fire under ice is dormant until the ice breaks.
+- A burning cell holds no dot; dots don't fall through it (the column grows in below).
+- Extinguished by one adjacent clear or by one blast landing on it. Also by an Eraser, a Sure Shot, or a monster eating it. Once out, it's a normal cell and refills in the same move.
+- **Spreads per region.** After the board settles, each connected region of fire that received no hit this move grows by one cell: a seeded pick among cells orthogonally next to it that aren't frozen, blocked, or burning. The new fire destroys what was there: a regular dot, a wild, a lotus, a nesting dot, or an anchor (uncredited). It skips gems, beetles, magnets, clouds, monsters, circuits, and pieces on a train `(default for the ones the original doesn't list)`. The destroyed dot counts toward nothing. Clearing the middle of a fire zone splits it into zones that spread independently.
+- Fire can spread onto watered and slimed cells. Blocks, one-sided blocks, and trapdoors contain it. Fire under ice is dormant.
 - Goal: extinguish all fire.
 
 ### Slime
-- A layer under dots. Clearing a dot on a slimed cell cleans that cell.
-- Each move in which no slime is cleaned, slime spreads to one adjacent clean cell that isn't burning.
-- Cleaning happens with the other layer reactions right after the cascade; spreading happens after the board settles, to a seeded pick among clean, unfrozen cells orthogonally next to active slime. Slime under ice is dormant: it can't be cleaned, doesn't spread, and still counts toward the goal.
-- Goal: clean all slime.
+- A layer under dots, two layers thick (fresh, bubbling). Dots on slime play normally.
+- One hit = one clear on that cell (the slimed dot used in a connection, a loop of its color, a blast, a lotus, a power-up). An adjacent clear does nothing. Two hits clean the cell.
+- **Spreads per region.** After the board settles, each connected region of slime that received no hit this move grows by one cell at full thickness: a seeded pick among orthogonally adjacent cells that aren't slimed, frozen, watered, blocked, or burning. Slime spreads onto empty cells (under blocks) and onto cells holding anchors, gems, or other pieces; it never moves with them and doesn't fall.
+- Blocked by blocks, one-sided blocks, trapdoors, ice, and water. Fire can burn on a slimed cell; both layers stay until each is dealt with. Monsters clean the slime off a cell they eat into.
+- Slime under ice is dormant: can't be hit, doesn't spread, still counts.
+- Goal: clean all slime (both layers).
 
-Water, fire, and slime share one spreading-layer system with per-type rules. Water spreads because of what the player does; fire and slime spread when ignored.
+### Blank dots (wilds)
+- A connectable dot with no color. It joins a connection of any color and can stand in for a dot of the loop's color in a loop. A connection may contain several wilds; its color is the color of its colored dots. A connection of only wilds is legal (2+) and clears just those wilds `(default)`.
+- A loop made entirely of wilds clears every dot on the board and delivers one hit to every obstacle that takes hits.
+- Falls like a dot; the level places them (and may drop more in: `wildDrops`). Not shuffled by reshuffles. Fire destroys a wild it spreads onto. Lotus connections don't pass through wilds. A wild never counts toward a collect goal.
+
+### Monster dots
+- A connectable dot with a color and a number (HP). Connecting it with dots of its color lowers the number by one per other dot in the connection; a loop or color clear of its color that doesn't run through it lowers it by one `(default reading of the guides)`. At zero it's removed.
+- Enclosed in a loop, it becomes a bomb and is removed at once. A blast reaching it removes it.
+- Each move in which a given monster wasn't part of a connection: it eats a seeded orthogonal neighbor (a dot of any kind, a wild, fire, an anchor without credit, a slimed cell's dot, cleaning the slime), moves into that cell, leaves a dot of its own color where it was, and its number rises by one. It doesn't eat gems, beetles, clouds, magnets, blocks, or other monsters `(default)`. Blocks contain it.
+- Falls like a dot. Doesn't count toward collect goals.
+- Goal: remove N monsters.
+
+### Circuits
+- A frame on a cell; the dot inside is a normal dot that falls and connects. A circuit is on or off. Any clear on the cell toggles it (a connection through the dot, a loop of its color, a blast, a lotus). An empty circuit cell can't toggle.
+- Circuits belong to groups (level data). When every circuit in a group is on at the end of the cascade, the group fires: each circuit cell becomes a bomb, explodes, the frames are removed, and the group counts toward the goal.
+- Goal: clear N circuits.
+
+### Lotus dots
+- A fixed piece with a color; doesn't fall, isn't connectable, and holds its cell `(default; the original doesn't say what the lotus itself does)`. After the move's cascade and before gravity, it clears every same-color dot connected to it by an orthogonal chain of that color, at no move cost. That clear counts as a clear (hits ice and slime once, floods water, triggers gems, toggles circuits) but never as a loop.
+- The chain doesn't pass through wilds, beetles, or monsters.
+- Levels may spawn lotuses on a schedule (`lotusDrops`: list of `{ "afterMove", "r", "c", "color" }`).
+- No goal of its own; it's a helper.
+
+### Nesting dots
+- Not connectable; falls like a dot. Three layers. One hit = one adjacent clear, one loop that clears an adjacent dot, or one blast. The third hit turns it into a bomb that explodes at once (8 neighbors), so it chains into gems and other nesting dots and destroys anchors (credited). An Eraser clears it fully.
+- Shakes when one hit away.
+- Usually no goal; levels may ask for N nesting dots popped.
+
+### Magnets
+- A wild that isn't consumed by an ordinary connection. When a connection includes a magnet, the magnet moves to the cell where the drag ended `(default; the original says "drag magnets along dots")` and the other dots clear as usual. A loop that includes a magnet clears the loop's color and leaves the magnet.
+- When two magnets are orthogonally adjacent after the board settles, both are removed and each explodes like a bomb. Three or more adjacent all go.
+- Falls like a dot. Not shuffled. Levels cap how many are on the board (`maxOnBoard`) and drop more in (`magnetDrops`).
+- Goal: collect N magnets.
 
 ### Gems
 - Each gem has one of the board's colors. It occupies a cell, isn't connectable, and falls with gravity.
-- Triggers when a loop of its color is made.
-- **Column gem** (rectangular): its beam clears its whole column.
-- **Cross gem** (square): its beams clear its row and its column.
-- A beam passing through another gem triggers that gem, so cascades are possible.
-- Cascades resolve in waves: everything set off together fires together (bombs and loop-triggered gems first); gems a wave reaches fire in the next wave. Bombs set off gems too. Beams cross walls and skip anchors; frozen gems are protected (their ice cracks instead). Each gem fires once and is removed when it fires.
+- Triggers when a loop or Color Burst of its color is made, or when a blast or lotus clear reaches it.
+- **Row gem** (horizontal rectangle): its beam clears its whole row. **Column gem** (vertical rectangle): its whole column. **Cross gem** (square): row and column.
+- Beams clear regular dots, destroy anchors (credited), blocks, one-sided blocks, clouds, and fire; deliver one hit to ice, slime, beetles, nesting dots, trapdoors; toggle circuits; trigger other gems in the next wave; flood water. Beams cross legacy walls and don't stop at anything. Frozen gems are protected (their ice cracks instead). Each gem fires once and is removed when it fires.
 - Goal option: trigger N gems.
 
-### Ladybugs
-- Start with 3 spots. Connectable like a dot of their current color.
-- Cleared at 3 or 2 spots: loses a spot, changes to a different color, and flies to a random cell (swapping with the dot there; seeded).
-- Cleared at 1 spot: removed.
-- Enclosed inside a loop: becomes a bomb and is removed regardless of spots.
-- Bombs, beams, and power-ups count as a clear (one spot lost).
-- A ladybug loses at most one spot per move. It changes color the moment it's hit and flies once the cascade is over (after ice and water react, before gravity), landing on a random unfrozen regular dot and swapping places with it. A ladybug's cell counts as cleared for ice, water, fire, and slime. Ladybugs aren't dots: they don't count toward collect goals, and reshuffles leave them in place.
+### Ladybugs (the original's Beetle Dots)
+- Start with 3 spots. Connectable like a dot of their current color. Falls like a dot. Has a facing direction.
+- One hit = being in a connection, a loop of its color, a blast, or a Color Burst / Eraser. A hit removes one spot and changes it to a different seeded color, at most one spot per move. Touch-and-hold on a ladybug previews its next color.
+- At the third hit it flies away and leaves a bomb on its cell, which explodes in the same cascade.
+- **Walks when ignored.** After the board settles, each ladybug that took no hit this move moves one cell in its facing direction, swapping places with what's there (a dot, wild, anchor, nesting dot, or empty-but-playable cell). If the next cell is off the board, empty space, a block, a fixed piece, or another ladybug, it turns 90° clockwise instead `(default direction)` and doesn't move this turn.
+- A loop around a ladybug does nothing to it; it isn't a dot `(default; original undocumented)`.
+- Ladybugs don't count toward collect goals; reshuffles leave them in place.
 - Goal option: clear N ladybugs.
 
+### Trapdoors
+- An open hole in the board. While open: holds nothing, can't be connected across, can't be watered or slimed, and lets dots and pieces fall through it to the cell below. Contains fire and slime.
+- Hits: 3 by default (level data can set 1–3 per trapdoor). One hit = one adjacent clear, a loop clearing an adjacent dot, or a blast. At zero it closes and becomes a normal cell that fills from above.
+- Goal: close N trapdoors.
+
+### Thunderclouds
+- Not connectable; falls like a dot; levels drop them in from the top with a cap (`maxOnBoard`, `cloudDrops`).
+- After the board settles, if two or more clouds share a row, they zap: every cell strictly between the outermost pair in that row is hit (regular dots clear, fire goes out, gems trigger, circuits toggle, anchors are destroyed and credited, blocks and one-sided blocks break, water floods; ice, slime, nesting dots, ladybugs, trapdoors take exactly one hit no matter how many clouds fired), and all clouds in that row are removed and counted. Costs no move. A zap can set off a cascade; resolve it and settle again.
+- A lone cloud is also removed (and counted) by a blast or an Eraser.
+- Goal: clear N clouds.
+
+### Trains
+- A track is a path of cells in level data; a train is one or more cars that sit on track cells, each carrying the dot (or piece) in its cell. Carried dots connect normally and don't fall.
+- After every move, no matter what else happened, each train advances one track cell in its direction, taking its cargo with it; the dot it uncovers is left in place, and the cell it moves into gives its dot to the car's previous cell `(default: a swap)`. At the end of a track the train reverses `(default)`. The car shows the direction of its next move.
+- Not clearable; no goal. A car can sit under ice.
+
 ### Later (record only, don't build yet)
-- **Monsters:** eat nearby dots unless connected to dots of their color.
-- **Clouds:** when two clouds are in the same row, lightning clears every dot between them and destroys both clouds.
-- **Ramps and diagonal falling** (see Board terrain).
+- **Ramps and side feeds** (see Board terrain).
+- Everything from the original's L911 onward (hermit crabs, flippers, meteors, fossils, sun dots, seed dots, snow, bubbles, moonstones, fireflies, ceramic tiles, targets, lanterns, ...). The reference documents them; add here only when one is chosen.
 
 ## Levels and progression
 
-- Levels are grouped into worlds. Each world introduces exactly one new mechanic, in build order. World 1 is core rules only, World 2 shaped boards, World 3 walls; the step 6 mechanics start at World 4.
+- Levels are grouped into worlds. Each world introduces exactly one new mechanic, in build order. World 1 is core rules only, World 2 shaped boards, World 3 walls (legacy); the step 6 mechanics start at World 4; new mechanics append as new worlds in the original's unlock order.
 - Levels unlock one at a time, in order. The developer switch unlocks everything.
-- Goal types: collect N dots of a color; sink N anchors; break N ice; flood the board; extinguish fire; clean slime; trigger N gems; clear N ladybugs. Levels can combine goals.
+- Goal types: collect N dots of a color; sink N anchors; break N ice; flood the board; extinguish fire; clean slime; trigger N gems; clear N ladybugs; remove N monsters; clear N circuits; pop N nesting dots; collect N magnets; close N trapdoors; clear N clouds. Levels can combine goals.
 - **Out of moves:** offer "5 more moves" (the assist) or an instant retry. No penalty either way.
 - **Assisted clear:** unlocks the next level but earns no stars or power-ups, and is marked in level select. Replaying without the assist can earn them.
 - **Stars, by moves used:** 1 star for any clear; 2 for using fewer moves than the bot's median run; 3 for matching the bot's best runs (default: top 10%). Thresholds are stored per level; expect retuning. Saves store best moves; stars are derived from the current thresholds, so retuning changes what level select shows.
-- **Power-ups:** earn 1 on the first 3-star clear of a level and 2 for finishing a world. Stored locally. Using one costs no move and doesn't mark the level assisted.
-  - **Pick:** remove one dot, or knock one layer off one obstacle.
-  - **Color clear:** clear every dot of a chosen color, as if a loop of that color had been made (so it triggers gems of that color).
-  - One pool: each power-up on hand can be used as either kind. Usable only while the game is on (not after running out of moves) and once the last move's dots have landed.
-  - Pick details: on a frozen cell it knocks off one ice layer (the dot stays); on a burning cell it puts the fire out; on a dot or ladybug it clears it (a ladybug loses one spot); on a gem it sets the gem off. Anchors and empty cells can't be picked.
-  - Color clear has no path, so nothing is enclosed and no bombs form. Frozen dots of the color stay, as with a real loop.
-  - Both count as clears for goals and obstacles (ice cracks, water floods, fire goes out, slime is cleaned), and the board settles and refills. Hazards don't spread afterwards, since no move was used. Rules: `applyPowerUp` / `canUsePowerUp` in `game.ts`.
+- **Power-ups:** the original's four in-level power-ups, earned instead of bought. Earn 1 on the first 3-star clear of a level and 2 for finishing a world. Stored locally. One pool: each power-up on hand can be used as any kind. Using one costs no move and doesn't mark the level assisted. Usable only while the game is on (not after running out of moves) and once the last move's dots have landed. Hazards don't spread and walkers don't walk after a power-up, since no move was used.
+  - **Eraser:** remove one chosen dot. On ice or slime: one hit, the dot stays. On fire: puts it out. On a ladybug: one hit. On a nesting dot: clears it fully. On a gem: sets it off. On a cloud: removes it. Anchors, blocks, and empty cells can't be erased.
+  - **Shuffler:** reshuffle the regular dots, as the stuck-board shuffle does.
+  - **Color Burst:** clear every dot of a chosen color as if a loop of that color had been made (triggers gems and hits monsters, ladybugs, ice, slime of that color), but with no path, so nothing is enclosed and no bombs form.
+  - **Sure Shot:** tap a dot; its whole row and column are cleared as a blast (same effects as a cross gem's beams).
+  - All four count as clears for goals and obstacles, and the board settles and refills. Rules: `applyPowerUp` / `canUsePowerUp` in `game.ts`.
   - Earning (`awardPowerUps` in `progress.ts`, run after every win and on load): 1 the first time a level's best unassisted moves reach 3 stars at its current thresholds; 2 the first time every level of a world has an unassisted clear. The save lists awards given, so each is earned once. Candidates never earn. The developer switch makes power-ups unlimited for testing.
 
 ## Level creation
@@ -177,23 +242,40 @@ Water, fire, and slime share one spreading-layer system with per-type rules. Wat
 
 ## Build order
 
+Steps 1–7 are done. The current build was written from memory of the original; step 8 brings the built mechanics in line with the original, then steps 9+ add the mechanics the original has that this game doesn't.
+
 1. Setup: PWA shell, rules module, test harness, config file, seeded RNG, and free static hosting (GitHub Pages or similar) so every working build can be opened on the phone.
 2. Core loop on one hardcoded board: drag, clear, gravity, refill, loops, bombs, moves, the collect-color goal, win/lose, auto-shuffle, colorblind symbols. Playtest on the phone until the feel is right before moving on.
 3. Level format (JSON), level select, saved progress, retry, assist.
 4. Terrain: walls, shaped boards.
 5. Generator and bot for the core rules; stars from bot results.
-6. Mechanics, one world each, extending the generator and bot with each: anchors → ice → water → gems → ladybugs → slime → fire. Add hazards-under-ice once ice and each hazard exist.
+6. Mechanics, one world each, extending the generator and bot with each: anchors → ice → water → gems → ladybugs → slime → fire. Hazards-under-ice.
 7. Power-ups.
-8. Sound, haptics, polish. Confirm offline play and home-screen install.
+8. **Migration to the original's rules**, one mechanic per commit, in this order, re-scoring the affected worlds with the bot after each and re-playtesting their levels:
+   1. Ice: overlay model (dot connectable, falls through, hit per clear on the cell, no gravity plug). This removes the "run under ice doesn't refill" gravity case and changes the frozen-anchor, frozen-gem, and ladybug-landing rules above.
+   2. Slime: two layers, hit = clear on the cell, per-region spread, spreads onto empty cells and onto pieces, overlaps with fire.
+   3. Fire: per-region spread, blasts extinguish, spread destroys anchors/wilds/lotus/nesting dots, spreads onto water and slime.
+   4. Anchors: blasts destroy and credit; `maxOnBoard` and `dropDelay`.
+   5. Gems: row gem; beams destroy anchors, blocks, clouds, fire.
+   6. Ladybugs: facing, walking, bomb on removal, no random flight, no loop kill.
+   7. Power-ups: rename Pick → Eraser and Color clear → Color Burst; add Shuffler and Sure Shot.
+   8. Leftover-move bombs; square-hint setting.
+9. New mechanics, one world each, in the original's order, extending the generator and bot with each: blocks → teleporters → blank dots → one-sided blocks → monsters → circuits → lotus → nesting dots → magnets → trapdoors → thunderclouds → trains.
+10. Sound, haptics, polish. Confirm offline play and home-screen install.
 
-## Defaults to revisit after playtesting
+## Defaults chosen where the original is undocumented
+
+Each is tagged `(default)` above. Revisit after playtesting; a change is a one-line edit here plus its test.
 
 - Refills can include the just-cleared color
-- Bomb radius: 8 neighbors
-- Ice: one layer per move; frozen dots can't be connected
-- Walls don't block falling
-- Anchors ignore bombs and beams; one new anchor drops in at a time
-- Water floods the whole cleared line
-- Fire and slime spread one cell per move, and never onto each other or onto water
-- Star cutoffs
-- Power-ups cost no move
+- Water floods the whole connected cleared set
+- Hazards placed under ice are dormant until the ice breaks; a frozen anchor on the bottom cell still sinks; a frozen gem is protected
+- Fire and slime spread targets are a seeded pick among eligible neighbors; what fire spares beyond the documented list
+- Monster HP drops one per other dot in the connection; one per loop/color clear of its color; +1 per move it eats; what it won't eat
+- Lotus persists, doesn't fall, isn't connectable
+- Magnet moves to the end of the drag
+- Ladybug turns clockwise when blocked; a loop around it does nothing
+- Wild-only connections are legal; a loop around an anchor does nothing
+- Teleported anchors don't sink at the pad
+- Train cars swap cargo with the cell ahead and reverse at track ends
+- Star cutoffs; power-ups cost no move
