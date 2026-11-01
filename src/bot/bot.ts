@@ -214,6 +214,8 @@ export function progressScore(before: GameState, after: GameState, startRemainin
     if (g.goal.type === 'ladybugs' && now > 0) score += 0.3 * share * (bugSpots(before) - bugSpots(after) - (was - now) );
     // Ice: partial credit for each layer knocked off.
     if (g.goal.type === 'ice' && now > 0) score += 0.3 * share * (iceLayers(before) - iceLayers(after));
+    // Slime: partial credit for each layer knocked off (spread counts against).
+    if (g.goal.type === 'slime' && now > 0) score += 0.3 * share * (slimeLayers(before) - slimeLayers(after));
   });
   return score;
 }
@@ -242,6 +244,8 @@ function gemSquares(s: GameState): number {
 const bugSpots = (s: GameState) => s.cells.reduce((n, p) => n + (p?.kind === 'ladybug' ? p.spots : 0), 0);
 
 const iceLayers = (s: GameState) => s.layers.ice.reduce((a, b) => a + b, 0);
+
+const slimeLayers = (s: GameState) => s.layers.slime.reduce((a, b) => a + b, 0);
 
 /** How many rows the anchors on both boards moved down, as a fraction of board height. */
 function anchorDescent(before: GameState, after: GameState): number {

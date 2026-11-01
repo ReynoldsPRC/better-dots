@@ -80,8 +80,8 @@ export interface Layers {
   ice: number[];
   /** Watered cells. Water under ice is dormant until the ice breaks. */
   water: boolean[];
-  /** Slimed cells. Slime under ice is dormant until the ice breaks. */
-  slime: boolean[];
+  /** Slime hits left per cell, 0-2. Slime under ice is dormant until the ice breaks. */
+  slime: number[];
   /** Burning cells: they hold no piece and gravity stops at them. Fire under ice is dormant. */
   fire: boolean[];
 }
@@ -116,7 +116,7 @@ export interface LevelDef {
   ice?: string[];
   /** Watered cells at the start: one string per row, '.' dry or 'x' watered. */
   water?: string[];
-  /** Slimed cells at the start: one string per row, '.' clean or 'x' slimed. */
+  /** Slimed cells at the start: one string per row, '.' clean, '1' or '2' hits left ('x' means 2). */
   slime?: string[];
   /** Burning cells at the start: one string per row, '.' or 'x' burning. */
   fire?: string[];

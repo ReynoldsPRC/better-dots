@@ -1,7 +1,7 @@
 {
   "id": "aa5jw3gy",
   "seed": 447811,
-  "moves": 18,
+  "moves": 58,
   "colors": [1, 2, 3, 4],
   "layout": [
     ".......",
@@ -33,6 +33,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 10, "three": 6 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 11, "p10": 6 }
+  "stars": { "two": 38, "three": 22 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 39, "p10": 22 }
 }

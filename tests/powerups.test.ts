@@ -40,10 +40,10 @@ describe('pick', () => {
     expect(state.cells[0]).not.toBeNull();
   });
 
-  it('cleans slime under a picked dot; other slime does not spread', () => {
+  it('hits slime under a picked dot; other slime does not spread', () => {
     const s = game(['012', '120', '200'], { slime: ['x..', '...', '..x'] });
     const { state } = applyPowerUp(s, { kind: 'pick', cell: 0 });
-    expect(state.layers.slime.flatMap((x, i) => (x ? [i] : []))).toEqual([at(s, 2, 2)]);
+    expect(state.layers.slime).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 2]);
   });
 
   it('a picked dot next to water floods', () => {

@@ -107,7 +107,7 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
   const ice = grid('ice', /^[1-3]$/, '1-3 for thickness');
   const iceCells = (ice ?? []).join('').replace(/\./g, '').length;
   const water = grid('water', /^x$/, 'x for watered');
-  const slime = grid('slime', /^x$/, 'x for slimed');
+  const slime = grid('slime', /^[12x]$/, '1-2 for hits left, or x for 2');
   const fire = grid('fire', /^x$/, 'x for burning');
   const burning = (r: number, c: number) => fire?.[r][c] === 'x';
   fire?.forEach((row, r) => [...row].forEach((ch, c) => {

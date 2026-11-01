@@ -1,7 +1,7 @@
 {
   "id": "zlmjbeh3",
   "seed": 749969,
-  "moves": 19,
+  "moves": 42,
   "colors": [0, 1, 3, 4],
   "layout": [
     "......",
@@ -22,6 +22,6 @@
   "goals": [
     { "type": "slime" }
   ],
-  "stars": { "two": 11, "three": 8 },
-  "bot": { "runs": 100, "winRate": 0.76, "median": 12, "p10": 8 }
+  "stars": { "two": 31, "three": 16 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 32, "p10": 16 }
 }

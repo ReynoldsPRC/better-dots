@@ -30,6 +30,8 @@ export interface Frame {
 export interface LayerChange {
   cell: number;
   layer: keyof Layers;
+  /** The layer's value before the change. */
+  from: number | boolean;
   progress: number;
 }
 
@@ -143,7 +145,8 @@ export class MoveAnimation {
         if (p < 1) {
           for (const cell of s.event.cells) {
             for (const layer of Object.keys(layers) as (keyof Layers)[]) {
-              if (layers[layer][cell] !== s.prevLayers![layer][cell]) changed.push({ cell, layer, progress: p });
+              const from = s.prevLayers![layer][cell];
+              if (layers[layer][cell] !== from) changed.push({ cell, layer, from, progress: p });
             }
           }
         }

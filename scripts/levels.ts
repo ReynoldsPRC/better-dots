@@ -4,6 +4,8 @@
 //   score [world ...] [--runs N]  re-run the bot; set moves, stars, and bot notes in each file
 //   generate <world> <count>      make candidates into levels/candidates/world-N/
 //                                 [--seed S] [--ramp a,b] (a..b within the preset's easy 0 to hard 1)
+//   regenerate <world> <n ...>    rebuild shipped levels n... in place from the world's preset, at their
+//                                 spot in the easy-to-hard ramp, with fresh ids; up to 3 seeds each [--seed S]
 //   keep <world> <n ...>          move candidates n... to the end of world N
 //   drop <world> <n ...>          remove levels n... from world N (renumbers the rest)
 //   reject <world> <n ...>        delete candidates n... (renumbers the rest)
@@ -140,6 +142,31 @@ switch (cmd) {
       writeFileSync(join(candDir(w), `${pad(n)}.json`), formatLevelJson(toLevelFile({ ...c.level, id: mintId() }, c.bot)));
       tries = 0;
       console.log(`candidate c${w}-${n}: moves ${c.level.moves}, bot win ${c.bot.winRate}, median ${c.bot.median}`);
+    }
+    break;
+  }
+  case 'regenerate': {
+    const [w, ...which] = nums;
+    const preset = presets[w];
+    if (!preset || which.length === 0) throw new Error(`usage: regenerate <world> <n ...>; presets exist for worlds ${Object.keys(presets).join(', ')}`);
+    const count = levelFiles(worldDir(w)).length;
+    for (const n of which) {
+      const file = join(worldDir(w), `${pad(n)}.json`);
+      if (!existsSync(file)) throw new Error(`no level ${file}`);
+      const t = count === 1 ? 0.5 : (n - 1) / (count - 1);
+      let made = false;
+      for (let attempt = 0; attempt < 3 && !made; attempt++) {
+        const seed = seedFlag + n * 1000 + attempt;
+        const c = generateCandidate({ ...preset(t), runs: Math.max(20, Math.round(runs / 2)) }, seed);
+        if (!c) {
+          console.log(`${w}-${n}: attempt ${attempt + 1} (seed ${seed}) found no winnable level`);
+          continue;
+        }
+        writeFileSync(file, formatLevelJson(toLevelFile({ ...c.level, id: mintId() }, c.bot)));
+        console.log(`${w}-${n}: regenerated (seed ${seed}): moves ${c.level.moves}, bot win ${c.bot.winRate}, median ${c.bot.median}`);
+        made = true;
+      }
+      if (!made) console.log(`${w}-${n}: 3 regenerations failed`);
     }
     break;
   }

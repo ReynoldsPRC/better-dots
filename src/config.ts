@@ -120,8 +120,10 @@ export const config = {
   },
 
   slime: {
-    /** Slime blob and bubble colors, light and dark themes. Dull olive so it never reads as the sage dot. */
+    /** Slime blob (two hits left) and bubble colors, light and dark themes. Dull olive so it never reads as the sage dot. */
     fill: { light: '#B3AC7E', dark: '#5E5A3C' },
+    /** Slime with one hit left: paler and thinner. */
+    thin: { light: '#CBC6A2', dark: '#4C4935' },
     bubble: { light: '#CFC9A2', dark: '#7A7550' },
     /** Blob size as a fraction of cell size; how much its edge wobbles. */
     scale: 0.9,

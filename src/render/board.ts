@@ -214,73 +214,85 @@ function drawWater(
 }
 
 /**
- * Slime: a lumpy blob with a couple of bubbles, under the dots. Neighboring
- * slimed cells join into one mass, like water. Newly slimed cells ooze in;
- * cleaned cells shrink away.
+ * Slime: a lumpy blob with a couple of bubbles, under the dots. Two hits left
+ * is fresh slime; one is thinner, paler, and bubbling. Neighboring slimed
+ * cells join into one mass, like water. Newly slimed cells ooze in; cleaned
+ * cells shrink away; a cell knocked down to one layer pulses.
  */
 function drawSlime(
   ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers, changed: LayerChange[], theme: Theme,
 ) {
   const { cell, x0, y0 } = layout;
   const t = config.slime;
-  const grow = new Map(changed.filter((c) => c.layer === 'slime').map((c) => [c.cell, c.progress]));
-  // Growing in, or (if the cell is clean now) shrinking away; 0 when there's no slime to draw.
+  const change = new Map(changed.filter((c) => c.layer === 'slime').map((c) => [c.cell, c]));
+  // Growing in, shrinking away (if the cell is clean now), or a brief dip when it loses a layer; 0 when there's nothing to draw.
   const amount = (i: number): number => {
-    const g = grow.get(i);
-    if (!layers.slime[i] && g === undefined) return 0;
-    return g === undefined ? 1 : layers.slime[i] ? ease('easeOutCubic', g) : 1 - ease('easeInQuad', g);
+    const ch = change.get(i);
+    if (!layers.slime[i] && !ch) return 0;
+    if (!ch) return 1;
+    if (!ch.from) return ease('easeOutCubic', ch.progress);
+    if (!layers.slime[i]) return 1 - ease('easeInQuad', ch.progress);
+    return 1 - 0.15 * Math.sin(Math.PI * ch.progress);
   };
   const ks = layers.slime.map((_, i) => amount(i));
+  // A cell shrinking away keeps the look of the layer it had.
+  const level = (i: number) => layers.slime[i] || Number(change.get(i)?.from ?? 0);
   const center = (i: number): [number, number] => [x0 + (i % s.cols + 0.5) * cell, y0 + (Math.floor(i / s.cols) + 0.5) * cell];
-  ctx.fillStyle = t.fill[theme];
 
-  // Bridges to the right and down neighbors, and a patch where four meet.
-  for (let i = 0; i < ks.length; i++) {
-    if (ks[i] <= 0) continue;
-    const [cx, cy] = center(i);
-    const c = i % s.cols;
-    const right = c + 1 < s.cols ? i + 1 : -1;
-    const down = i + s.cols < ks.length ? i + s.cols : -1;
-    for (const j of [right, down]) {
-      if (j < 0 || ks[j] <= 0) continue;
-      const w = cell * t.bridge * Math.min(ks[i], ks[j]);
+  // Thin slime first, then fresh slime over it. A bridge to the right or down
+  // neighbor, and the patch where four meet, take the thinner look of the cells.
+  for (const pass of [1, 2]) {
+    ctx.fillStyle = pass === 2 ? t.fill[theme] : t.thin[theme];
+    for (let i = 0; i < ks.length; i++) {
+      if (ks[i] <= 0) continue;
+      const [cx, cy] = center(i);
+      const right = i % s.cols + 1 < s.cols ? i + 1 : -1;
+      const down = i + s.cols < ks.length ? i + s.cols : -1;
+      for (const j of [right, down]) {
+        if (j < 0 || ks[j] <= 0 || Math.min(level(i), level(j)) !== pass) continue;
+        const w = cell * t.bridge * Math.min(ks[i], ks[j]);
+        if (j === right) ctx.fillRect(cx, cy - w / 2, cell, w);
+        else ctx.fillRect(cx - w / 2, cy, w, cell);
+      }
+      const quad = [i, right, down, down + 1];
+      if (right >= 0 && down >= 0 && quad.every((j) => ks[j] > 0) && Math.min(...quad.map(level)) === pass) {
+        const k = Math.min(...quad.map((j) => ks[j]));
+        ctx.fillRect(cx, cy, cell * k, cell * k);
+      }
+    }
+    for (let i = 0; i < ks.length; i++) {
+      if (ks[i] <= 0 || level(i) !== pass) continue;
+      const [cx, cy] = center(i);
+      const rad = (cell * t.scale * ks[i]) / 2;
       ctx.beginPath();
-      if (j === right) ctx.rect(cx, cy - w / 2, cell, w);
-      else ctx.rect(cx - w / 2, cy, w, cell);
+      for (let a = 0; a <= 16; a++) {
+        const ang = (a / 16) * Math.PI * 2;
+        const wob = 1 + t.wobble * Math.sin(ang * 3 + i) - t.wobble * 0.5 * Math.cos(ang * 5 + i * 2);
+        const px = cx + Math.cos(ang) * rad * wob;
+        const py = cy + Math.sin(ang) * rad * wob;
+        if (a === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
       ctx.fill();
     }
-    if (right >= 0 && down >= 0 && ks[right] > 0 && ks[down] > 0 && ks[down + 1] > 0) {
-      const k = Math.min(ks[i], ks[right], ks[down], ks[down + 1]);
-      ctx.fillRect(cx, cy, cell * k, cell * k);
-    }
   }
 
-  for (let i = 0; i < ks.length; i++) {
-    const k = ks[i];
-    if (k <= 0) continue;
-    const [cx, cy] = center(i);
-    const rad = (cell * t.scale * k) / 2;
-    ctx.beginPath();
-    for (let a = 0; a <= 16; a++) {
-      const ang = (a / 16) * Math.PI * 2;
-      const wob = 1 + t.wobble * Math.sin(ang * 3 + i) - t.wobble * 0.5 * Math.cos(ang * 5 + i * 2);
-      const px = cx + Math.cos(ang) * rad * wob;
-      const py = cy + Math.sin(ang) * rad * wob;
-      if (a === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.fillStyle = t.bubble[theme];
+  // Bubbles on top: two pale ones on fresh slime, more and darker on thin (bubbling) slime.
   for (let i = 0; i < ks.length; i++) {
     if (ks[i] <= 0) continue;
+    ctx.fillStyle = level(i) === 1 ? t.fill[theme] : t.bubble[theme];
     const [cx, cy] = center(i);
     const rad = (cell * t.scale * ks[i]) / 2;
     ctx.beginPath();
     ctx.arc(cx - rad * 0.55, cy + rad * 0.45, rad * 0.12, 0, Math.PI * 2);
     ctx.arc(cx + rad * 0.6, cy - rad * 0.5, rad * 0.09, 0, Math.PI * 2);
+    if (level(i) === 1) {
+      ctx.moveTo(cx + rad * 0.62, cy + rad * 0.4);
+      ctx.arc(cx + rad * 0.5, cy + rad * 0.4, rad * 0.12, 0, Math.PI * 2);
+      ctx.moveTo(cx - rad * 0.5, cy - rad * 0.55);
+      ctx.arc(cx - rad * 0.58, cy - rad * 0.55, rad * 0.08, 0, Math.PI * 2);
+    }
     ctx.fill();
   }
 }
