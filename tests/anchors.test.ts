@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { applyMove, createGame, extendPath, hasMove, parseLevel, type GameState, type LevelDef } from '../src/rules';
+import { applyMove, createGame, extendPath, hasMove, isValidPath, parseLevel, type GameState, type LevelDef } from '../src/rules';
 import { at, cells, game } from './helpers';
 
 const anchorAt = (s: GameState, r: number, c: number) => s.cells[at(s, r, c)]?.kind === 'anchor';
 const countAnchors = (s: GameState) => s.cells.filter((p) => p?.kind === 'anchor').length;
+/** Any legal two-dot line on the board. */
+const anyPair = (s: GameState): number[] => {
+  for (let i = 0; i < s.cells.length; i++) for (const j of [i + 1, i + s.cols]) if (isValidPath(s, [i, j])) return [i, j];
+  throw new Error('no move');
+};
 
 describe('anchors', () => {
   const level = (extra: Partial<LevelDef> = {}): LevelDef => ({
@@ -39,17 +44,28 @@ describe('anchors', () => {
     expect(countAnchors(state)).toBe(0);
   });
 
-  it('are not hurt by bombs and do not become bombs', () => {
+  it('a blast destroys anchors and counts them; a loop around one does not make it a bomb', () => {
     const s = game(['0000', '0..0', '0000', '1212'], {
       pieces: [{ r: 1, c: 1, type: 'anchor' }, { r: 3, c: 0, type: 'anchor' }], colors: [1, 2],
+      goals: [{ type: 'anchors', count: 2 }],
     });
-    // Fill the middle (1,2) with a non-zero dot so it becomes a bomb next to the anchor.
+    // The middle (1,2) gets a non-zero dot, so it becomes a bomb next to the enclosed anchor.
     const ring = cells(s, [0, 0], [0, 1], [0, 2], [0, 3], [1, 3], [2, 3], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]);
-    const { result } = applyMove({ ...s, bombRadius: 2 }, ring);
+    const { state, result } = applyMove({ ...s, bombRadius: 2 }, ring);
     const blast = result.steps.find((st) => st.kind === 'blast')!;
     expect(blast.sources.map((x) => x.cell)).toEqual([at(s, 1, 2)]);
-    expect(blast.cells).not.toContain(at(s, 1, 1));
-    expect(blast.cells).not.toContain(at(s, 3, 0));
+    expect(blast.cells).toContain(at(s, 1, 1));
+    expect(blast.cells).toContain(at(s, 3, 0));
+    expect(state.goals[0].progress).toBe(2);
+  });
+
+  it('a loop around an anchor does nothing to it', () => {
+    const s = game(['000', '0.0', '000', '121'], { pieces: [{ r: 1, c: 1, type: 'anchor' }], goals: [{ type: 'anchors', count: 1 }], colors: [1, 2] });
+    const ring = cells(s, [0, 0], [0, 1], [0, 2], [1, 2], [2, 2], [2, 1], [2, 0], [1, 0], [0, 0]);
+    const { state, result } = applyMove(s, ring);
+    expect(result.steps.map((x) => x.kind)).toEqual(['loop']);
+    expect(countAnchors(state)).toBe(1);
+    expect(state.goals[0].progress).toBe(0);
   });
 
   it('drop in from the top until the level runs out', () => {
@@ -73,6 +89,32 @@ describe('anchors', () => {
     expect(next.layers.ice[at(s, 2, 0)]).toBe(2);
   });
 
+  it('maxOnBoard: drops keep coming until the board holds that many', () => {
+    const s = createGame(level({ anchorDrops: 1, maxOnBoard: 2, goals: [{ type: 'anchors', count: 2 }] }));
+    const next = applyMove(s, cells(s, [1, 0], [1, 1])).state;
+    expect(countAnchors(next)).toBe(2);
+  });
+
+  it('dropDelay: the board waits that many moves short of anchors before the next drops', () => {
+    const lvl = { ...level({ anchorDrops: 2, dropDelay: 1, goals: [{ type: 'anchors' as const, count: 3 }] }), layout: ['.1', '00', '00'] };
+    let s = createGame(lvl);
+    s = applyMove(s, cells(s, [1, 0], [2, 0])).state;
+    // The anchor sank; the board was full until this move, so it waits one move.
+    expect(s.goals[0].progress).toBe(1);
+    expect(countAnchors(s)).toBe(0);
+    s = applyMove(s, anyPair(s)).state;
+    expect(countAnchors(s)).toBe(1);
+    expect(s.anchorDrops).toBe(1);
+  });
+
+  it('at most one anchor drops per move, even when one sinks as soon as it lands', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = createGame({ ...level({ anchorDrops: 5, goals: [{ type: 'anchors', count: 6 }] }), layout: ['.0', '-0'] }, { playSeed: seed });
+      const next = applyMove(s, cells(s, [0, 1], [1, 1])).state;
+      expect(s.anchorDrops - next.anchorDrops).toBeLessThanOrEqual(1);
+    }
+  });
+
   it('stay put when a stuck board is reshuffled', () => {
     // Two colors on a 3x2 area get stuck for some seeds.
     for (let seed = 1; seed <= 20; seed++) {
@@ -89,6 +131,10 @@ describe('anchors', () => {
     const base = { id: 'testlvl', seed: 1, moves: 5, colors: [0, 1], layout: ['..', '..'], goals: [{ type: 'anchors', count: 2 }] };
     expect(() => parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }] }, 'x')).toThrow(/only has 1/);
     expect(parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }], anchorDrops: 1 }, 'x').anchorDrops).toBe(1);
+    const drops = { ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }], anchorDrops: 1 };
+    expect(parseLevel({ ...drops, maxOnBoard: 2, dropDelay: 1 }, 'x')).toMatchObject({ maxOnBoard: 2, dropDelay: 1 });
+    expect(() => parseLevel({ ...drops, maxOnBoard: 0 }, 'x')).toThrow(/"maxOnBoard"/);
+    expect(() => parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'anchor' }, { r: 0, c: 1, type: 'anchor' }], dropDelay: 1 }, 'x')).toThrow(/only applies/);
     expect(() => parseLevel({ ...base, pieces: [{ r: 5, c: 0, type: 'anchor' }] }, 'x')).toThrow(/cell of the layout/);
     expect(() => parseLevel({ ...base, pieces: [{ r: 0, c: 0, type: 'boat' }] }, 'x')).toThrow(/unknown type/);
   });

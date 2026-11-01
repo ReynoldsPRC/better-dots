@@ -112,6 +112,10 @@ export interface LevelDef {
   pieces?: PlacedPiece[];
   /** How many more anchors drop in from the top over the level. */
   anchorDrops?: number;
+  /** Most anchors on the board at once before another drops in (default: the starting count, at least 1). */
+  maxOnBoard?: number;
+  /** Moves the board must stay below `maxOnBoard` before the next anchor drops (default 0). */
+  dropDelay?: number;
   /** Ice thickness per cell: one string per row, '.' none or '1'-'3'. */
   ice?: string[];
   /** Watered cells at the start: one string per row, '.' dry or 'x' watered. */
@@ -152,6 +156,10 @@ export interface GameState {
   anchorDrops: number;
   /** A new anchor drops in when fewer than this many are on the board. */
   anchorTarget: number;
+  /** Moves the board waits below `anchorTarget` before an anchor drops (the level's `dropDelay`). */
+  anchorDelay: number;
+  /** Moves left in the current wait; 0 means the next fall may drop an anchor. */
+  anchorWait: number;
 }
 
 /** What one move achieved, for goal progress. */

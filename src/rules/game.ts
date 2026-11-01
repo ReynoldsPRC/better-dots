@@ -100,7 +100,9 @@ export function createGame(level: LevelDef, opts: GameOptions = {}): GameState {
     status: 'playing',
     bombRadius: opts.bombRadius ?? config.bomb.radius,
     anchorDrops: level.anchorDrops ?? 0,
-    anchorTarget: Math.max(1, startAnchors),
+    anchorTarget: level.maxOnBoard ?? Math.max(1, startAnchors),
+    anchorDelay: level.dropDelay ?? 0,
+    anchorWait: level.dropDelay ?? 0,
   };
   // At the start only the randomly filled cells are shuffled; dots the level placed stay put.
   state.cells = reshuffleUntilPlayable(state, state.cells, boardRng, (i) => random.has(i));
@@ -212,6 +214,8 @@ class Move {
   readonly rng: Rng;
   nextId: number;
   anchorDrops: number;
+  /** An anchor already dropped in this move. */
+  private anchorDropped = false;
   readonly layers: Layers;
   readonly events: MoveEvent[] = [];
   readonly tally: Tally = { collected: [0, 0, 0, 0, 0], anchors: 0, ice: 0, gems: 0, ladybugs: 0 };
@@ -277,13 +281,21 @@ class Move {
   }
 
   /**
-   * Clears one cell. Returns true if a piece was removed. Anchors only leave
-   * by sinking; a gem on ice is protected. A clear hits the cell's ice or
-   * slime, unless `layerHit` is false (blasts hit layers per source instead).
+   * Clears one cell. Returns true if a piece was removed. An anchor leaves by
+   * sinking or to a blast, which counts it; a gem on ice is protected. A
+   * clear hits the cell's ice or slime, unless `layerHit` is false (blasts
+   * hit layers per source instead).
    */
-  clear(i: number, layerHit = true): boolean {
+  clear(i: number, layerHit = true, blast = false): boolean {
     const p = this.cells[i];
-    if (!p || p.kind === 'anchor') return false;
+    if (!p) return false;
+    if (p.kind === 'anchor') {
+      if (!blast) return false;
+      this.cells[i] = null;
+      this.cleared.add(i);
+      this.tally.anchors++;
+      return true;
+    }
     if (p.kind === 'gem' && this.layers.ice[i] > 0) return false;
     if (p.kind === 'ladybug') {
       if (this.bugsHit.has(p.id)) return false;
@@ -351,7 +363,7 @@ class Move {
         if (src) this.nextWave.push(src);
       }
     }
-    const removed = all.filter((i) => this.clear(i, kind !== 'blast'));
+    const removed = all.filter((i) => this.clear(i, kind !== 'blast', kind === 'blast'));
     this.emit({ kind: 'clear', step: { kind, cells: removed, sources } });
   }
 
@@ -557,10 +569,10 @@ class Move {
       flush();
     }
 
-    // At most one anchor drops in per fall, at the top of a seeded column.
+    // At most one anchor drops in per move, at the top of a seeded column, once the wait is over.
     let anchorSlot = -1;
     const onBoard = cells.filter((p) => p?.kind === 'anchor').length;
-    if (this.anchorDrops > 0 && onBoard < s.anchorTarget) {
+    if (this.anchorDrops > 0 && !this.anchorDropped && onBoard < s.anchorTarget && s.anchorWait === 0) {
       const tops = slots.filter((x, k) => x.top && (k === 0 || slots[k - 1].i % s.cols !== x.i % s.cols));
       if (tops.length > 0) anchorSlot = tops[rng.int(tops.length)].i;
     }
@@ -570,6 +582,7 @@ class Move {
       if (slot.i === anchorSlot) {
         cells[slot.i] = { kind: 'anchor', id };
         this.anchorDrops--;
+        this.anchorDropped = true;
       } else {
         cells[slot.i] = { kind: 'dot', id, color: rng.pick(s.colors) };
       }
@@ -714,6 +727,15 @@ export function applyPowerUp(s: GameState, p: PowerUp): { state: GameState; resu
   return finish(s, m, { path: [], color, loop: p.kind === 'colorClear', usesMove: false });
 }
 
+/**
+ * The drop wait after a move: it counts down while the board has fewer
+ * anchors than it holds (and more are to come), and starts over once full.
+ */
+function nextAnchorWait(s: GameState, cells: Cells): number {
+  const onBoard = cells.filter((p) => p?.kind === 'anchor').length;
+  return onBoard < s.anchorTarget ? Math.max(0, s.anchorWait - 1) : s.anchorDelay;
+}
+
 /** Builds the next state and the result from a resolved move or power-up. */
 function finish(
   s: GameState, m: Move, r: { path: number[]; color: ColorId; loop: boolean; usesMove: boolean },
@@ -726,6 +748,7 @@ function finish(
     nextId: m.nextId,
     anchorDrops: m.anchorDrops,
     movesUsed: s.movesUsed + (r.usesMove ? 1 : 0),
+    anchorWait: r.usesMove ? nextAnchorWait(s, m.cells) : s.anchorWait,
     goals: s.goals.map((g) => ({ goal: g.goal, progress: g.progress + progressFor(g, m.tally) })),
   };
   if (next.goals.length > 0 && next.goals.every((g) => goalDone(next, g))) next.status = 'won';

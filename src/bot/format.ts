@@ -19,7 +19,7 @@ export function toLevelFile(level: LevelDef, bot?: BotNote): LevelFile {
   const { label: _label, ...rest } = level;
   const out: Record<string, unknown> = {};
   // Fixed key order keeps diffs small.
-  for (const k of ['id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'ice', 'water', 'slime', 'fire', 'goals', 'stars'] as const) {
+  for (const k of ['id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'maxOnBoard', 'dropDelay', 'ice', 'water', 'slime', 'fire', 'goals', 'stars'] as const) {
     if (rest[k] !== undefined) out[k] = rest[k];
   }
   for (const [k, v] of Object.entries(rest)) if (!(k in out) && v !== undefined) out[k] = v;

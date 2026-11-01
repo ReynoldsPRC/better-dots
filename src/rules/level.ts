@@ -7,7 +7,7 @@ const isColor = (v: unknown): v is ColorId => isInt(v) && v >= 0 && v < MAX_COLO
 
 /** Every key a level file may have. Anything else is most likely a typo. */
 const LEVEL_KEYS = [
-  'id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'ice', 'water', 'slime', 'fire', 'goals', 'stars', 'bot',
+  'id', 'name', 'seed', 'moves', 'colors', 'layout', 'walls', 'pieces', 'anchorDrops', 'maxOnBoard', 'dropDelay', 'ice', 'water', 'slime', 'fire', 'goals', 'stars', 'bot',
 ];
 const GOAL_KEYS: Record<string, string[]> = {
   collect: ['type', 'color', 'count'],
@@ -152,6 +152,14 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
     if (!isInt(o.anchorDrops) || o.anchorDrops < 0) fail('"anchorDrops" must be a whole number');
     anchorDrops = o.anchorDrops as number;
   }
+  const anchorSetting = (key: 'maxOnBoard' | 'dropDelay', min: number): number | undefined => {
+    if (o[key] === undefined) return undefined;
+    if (!isInt(o[key]) || (o[key] as number) < min) fail(`"${key}" must be a whole number of at least ${min}`);
+    if (anchorDrops === undefined) fail(`"${key}" only applies with "anchorDrops"`);
+    return o[key] as number;
+  };
+  const maxOnBoard = anchorSetting('maxOnBoard', 1);
+  const dropDelay = anchorSetting('dropDelay', 0);
 
   if (!Array.isArray(o.goals) || o.goals.length === 0) fail('"goals" must be a non-empty list');
   const positive = (v: unknown, k: number) => {
@@ -222,6 +230,8 @@ export function parseLevel(raw: unknown, label: string): LevelDef {
     walls,
     pieces,
     anchorDrops,
+    maxOnBoard,
+    dropDelay,
     ice,
     water,
     slime,
