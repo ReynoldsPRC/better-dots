@@ -33,6 +33,6 @@
   "goals": [
     { "type": "flood" }
   ],
-  "stars": { "two": 14, "three": 11 },
-  "bot": { "runs": 100, "winRate": 0.75, "median": 15, "p10": 11 }
+  "stars": { "two": 14, "three": 10 },
+  "bot": { "runs": 100, "winRate": 0.77, "median": 15, "p10": 10 }
 }

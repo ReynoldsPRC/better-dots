@@ -1,7 +1,7 @@
 {
   "id": "kzw7zwn5",
   "seed": 668903,
-  "moves": 21,
+  "moves": 35,
   "colors": [0, 1, 2, 3, 4],
   "layout": [
     ".--.--.",
@@ -29,6 +29,6 @@
     { "type": "ice", "count": 7 },
     { "type": "collect", "color": 3, "count": 12 }
   ],
-  "stars": { "two": 15, "three": 11 },
-  "bot": { "runs": 100, "winRate": 0.77, "median": 16, "p10": 11 }
+  "stars": { "two": 22, "three": 13 },
+  "bot": { "runs": 100, "winRate": 0.75, "median": 23, "p10": 13 }
 }
