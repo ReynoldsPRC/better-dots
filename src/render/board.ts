@@ -48,6 +48,7 @@ export function drawScene(
   drawWater(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
   drawSlime(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
   drawFire(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
+  drawIce(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
 
   const dragColor = drag && drag.path.length > 0 ? connectableColor(state, drag.path[0]) : null;
 
@@ -118,8 +119,6 @@ export function drawScene(
     }
   }
 
-  drawIce(ctx, layout, state, frame?.layers ?? state.layers, frame?.changed ?? [], theme);
-
   for (const b of frame?.blasts ?? []) {
     const [x, y] = toScreen(layout, b.r, b.c);
     if (b.type !== 'bomb') continue;
@@ -132,8 +131,10 @@ export function drawScene(
 }
 
 /**
- * Ice over its cell: a pale tile whose look follows thickness. 3 is fresh,
- * 2 cracked, 1 nearly broken. Cells that just changed flash briefly.
+ * Ice on its cell: a pale tile under the dot (the dot stays in full color, since
+ * it plays normally), whose look follows thickness. 3 is fresh, 2 cracked, 1
+ * nearly broken; the cracks sit in the ring the dot doesn't cover. Cells that
+ * just changed flash briefly. Drawn over water, slime, and fire, which it holds dormant.
  */
 function drawIce(
   ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers,
@@ -173,11 +174,14 @@ function drawIce(
       ctx.moveTo(x + pts[0][0] * size, y + pts[0][1] * size);
       for (const [px, py] of pts.slice(1)) ctx.lineTo(x + px * size, y + py * size);
     };
-    if (n <= 2) crack([[0.08, 0.3], [0.35, 0.42], [0.5, 0.28], [0.72, 0.4]]);
+    if (n <= 2) {
+      crack([[0.03, 0.34], [0.16, 0.24], [0.2, 0.1], [0.3, 0.03]]);
+      crack([[0.97, 0.7], [0.84, 0.8], [0.78, 0.97]]);
+    }
     if (n <= 1) {
-      crack([[0.35, 0.42], [0.42, 0.7], [0.3, 0.92]]);
-      crack([[0.72, 0.4], [0.92, 0.66]]);
-      crack([[0.5, 0.28], [0.58, 0.06]]);
+      crack([[0.16, 0.24], [0.05, 0.1]]);
+      crack([[0.7, 0.03], [0.78, 0.16], [0.97, 0.22]]);
+      crack([[0.03, 0.72], [0.18, 0.8], [0.24, 0.97]]);
     }
     ctx.stroke();
     if (f !== undefined) {
@@ -210,8 +214,9 @@ function drawWater(
 }
 
 /**
- * Slime: a lumpy blob with a couple of bubbles, under the dots. Newly slimed
- * cells ooze in; cleaned cells shrink away.
+ * Slime: a lumpy blob with a couple of bubbles, under the dots. Neighboring
+ * slimed cells join into one mass, like water. Newly slimed cells ooze in;
+ * cleaned cells shrink away.
  */
 function drawSlime(
   ctx: CanvasRenderingContext2D, layout: Layout, s: GameState, layers: Layers, changed: LayerChange[], theme: Theme,
@@ -219,16 +224,42 @@ function drawSlime(
   const { cell, x0, y0 } = layout;
   const t = config.slime;
   const grow = new Map(changed.filter((c) => c.layer === 'slime').map((c) => [c.cell, c.progress]));
-  for (let i = 0; i < layers.slime.length; i++) {
+  // Growing in, or (if the cell is clean now) shrinking away; 0 when there's no slime to draw.
+  const amount = (i: number): number => {
     const g = grow.get(i);
-    if (!layers.slime[i] && g === undefined) continue;
-    // Growing in, or (if the cell is clean now) shrinking away.
-    const k = g === undefined ? 1 : layers.slime[i] ? ease('easeOutCubic', g) : 1 - ease('easeInQuad', g);
+    if (!layers.slime[i] && g === undefined) return 0;
+    return g === undefined ? 1 : layers.slime[i] ? ease('easeOutCubic', g) : 1 - ease('easeInQuad', g);
+  };
+  const ks = layers.slime.map((_, i) => amount(i));
+  const center = (i: number): [number, number] => [x0 + (i % s.cols + 0.5) * cell, y0 + (Math.floor(i / s.cols) + 0.5) * cell];
+  ctx.fillStyle = t.fill[theme];
+
+  // Bridges to the right and down neighbors, and a patch where four meet.
+  for (let i = 0; i < ks.length; i++) {
+    if (ks[i] <= 0) continue;
+    const [cx, cy] = center(i);
+    const c = i % s.cols;
+    const right = c + 1 < s.cols ? i + 1 : -1;
+    const down = i + s.cols < ks.length ? i + s.cols : -1;
+    for (const j of [right, down]) {
+      if (j < 0 || ks[j] <= 0) continue;
+      const w = cell * t.bridge * Math.min(ks[i], ks[j]);
+      ctx.beginPath();
+      if (j === right) ctx.rect(cx, cy - w / 2, cell, w);
+      else ctx.rect(cx - w / 2, cy, w, cell);
+      ctx.fill();
+    }
+    if (right >= 0 && down >= 0 && ks[right] > 0 && ks[down] > 0 && ks[down + 1] > 0) {
+      const k = Math.min(ks[i], ks[right], ks[down], ks[down + 1]);
+      ctx.fillRect(cx, cy, cell * k, cell * k);
+    }
+  }
+
+  for (let i = 0; i < ks.length; i++) {
+    const k = ks[i];
     if (k <= 0) continue;
-    const cx = x0 + (i % s.cols + 0.5) * cell;
-    const cy = y0 + (Math.floor(i / s.cols) + 0.5) * cell;
+    const [cx, cy] = center(i);
     const rad = (cell * t.scale * k) / 2;
-    ctx.fillStyle = t.fill[theme];
     ctx.beginPath();
     for (let a = 0; a <= 16; a++) {
       const ang = (a / 16) * Math.PI * 2;
@@ -240,7 +271,13 @@ function drawSlime(
     }
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = t.bubble[theme];
+  }
+
+  ctx.fillStyle = t.bubble[theme];
+  for (let i = 0; i < ks.length; i++) {
+    if (ks[i] <= 0) continue;
+    const [cx, cy] = center(i);
+    const rad = (cell * t.scale * ks[i]) / 2;
     ctx.beginPath();
     ctx.arc(cx - rad * 0.55, cy + rad * 0.45, rad * 0.12, 0, Math.PI * 2);
     ctx.arc(cx + rad * 0.6, cy - rad * 0.5, rad * 0.09, 0, Math.PI * 2);

@@ -126,6 +126,8 @@ export const config = {
     /** Blob size as a fraction of cell size; how much its edge wobbles. */
     scale: 0.9,
     wobble: 0.05,
+    /** Width of the bridge joining neighboring slimed cells, as a fraction of cell size. */
+    bridge: 0.7,
   },
 
   fire: {
