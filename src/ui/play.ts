@@ -5,8 +5,8 @@ import { drawScene, type DragView } from '../render/board';
 import { fitCanvas, type Surface } from '../render/canvas';
 import { cellAt, computeLayout, type Layout } from '../render/layout';
 import {
-  addMoves, applyMove, applyPowerUp, canUsePowerUp, extendPath, goalDone, goalRemaining, isLoopClosed, isValidPath, movesLeft,
-  type GameState, type PowerUp,
+  addMoves, applyMove, applyPowerUp, canUsePowerUp, extendPath, goalDone, goalRemaining, hintSquare, isLoopClosed, isValidPath,
+  leftoverBombs, movesLeft, type GameState, type MoveResult, type PowerUp,
 } from '../rules';
 import { currentTheme, el, goalIcon } from './dom';
 
@@ -14,6 +14,8 @@ export interface PlayHooks {
   /** Called once the final move's animation has finished. */
   onEnd(state: GameState): void;
   colorblind(): boolean;
+  /** Whether the square hint setting is on. */
+  squareHint(): boolean;
   /** A power-up was used (spend it). */
   powerUsed(): void;
   /** A power-up started or stopped waiting for a tap on the board. */
@@ -32,6 +34,12 @@ export class PlayScreen {
   private raf = 0;
   /** A power-up waiting for a tap: the next tap on the board aims it at that cell. */
   private target: TargetPowerUp | null = null;
+  /** After a win, the leftover-move bombs still to animate (null until the win's own animation ends). */
+  private finale: { state: GameState; result: MoveResult }[] | null = null;
+  /** Last touch or move, for the square hint's idle timer; and the hint found for the current board. */
+  private lastInput = 0;
+  private hint: { state: GameState; path: number[] | null } | null = null;
+  private hintTimer = 0;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -52,6 +60,8 @@ export class PlayScreen {
     this.state = state;
     this.anim = null;
     this.drag = null;
+    this.finale = null;
+    this.lastInput = performance.now();
     this.setTarget(null);
     this.resize();
     this.renderHud();
@@ -94,7 +104,8 @@ export class PlayScreen {
     this.raf = 0;
     if (!this.state) return;
     const f = this.anim?.frame(now) ?? null;
-    drawScene(this.surface, this.layout, this.state, f, this.drag, { theme: currentTheme(), colorblind: this.hooks.colorblind() }, now);
+    const hint = this.hintFor(now);
+    drawScene(this.surface, this.layout, this.state, f, this.drag, { theme: currentTheme(), colorblind: this.hooks.colorblind() }, now, hint);
     // Counts change when the cleared dots have popped, not when the finger lifts.
     if (this.anim && !this.anim.hudShown && now >= this.anim.hudAt) {
       this.anim.hudShown = true;
@@ -102,10 +113,39 @@ export class PlayScreen {
     }
     if (f?.done) {
       this.anim = null;
-      if (this.state.status !== 'playing') this.hooks.onEnd(this.state);
+      this.lastInput = now;
+      if (this.state.status !== 'playing' && !this.nextFinaleBomb(now)) this.hooks.onEnd(this.state);
     }
     const rippling = this.drag && now - this.drag.addedAt < config.select.ringMs;
-    if (this.anim || rippling) this.redraw();
+    if (this.anim || rippling || hint) this.redraw();
+  }
+
+  /** After a win, starts the next leftover-move bomb. Returns false once there are none left. */
+  private nextFinaleBomb(now: number): boolean {
+    if (this.state.status !== 'won') return false;
+    this.finale ??= leftoverBombs(this.state);
+    const step = this.finale.shift();
+    if (!step) return false;
+    this.anim = new MoveAnimation(this.state, step.result, step.state, now);
+    this.state = step.state;
+    this.redraw();
+    return true;
+  }
+
+  /**
+   * The square hint to show now, if it's on and the board has sat idle long
+   * enough. While waiting, schedules a redraw for when it's due.
+   */
+  private hintFor(now: number): { path: readonly number[]; since: number } | null {
+    clearTimeout(this.hintTimer);
+    if (!this.hooks.squareHint() || this.state.status !== 'playing' || this.drag || this.anim || this.target) return null;
+    const since = this.lastInput + config.hint.delayMs;
+    if (now < since) {
+      this.hintTimer = window.setTimeout(() => this.redraw(), since - now);
+      return null;
+    }
+    if (this.hint?.state !== this.state) this.hint = { state: this.state, path: hintSquare(this.state) };
+    return this.hint.path ? { path: this.hint.path, since } : null;
   }
 
   private point(e: PointerEvent): [number, number] {
@@ -146,6 +186,7 @@ export class PlayScreen {
   }
 
   private down(e: PointerEvent): void {
+    this.lastInput = performance.now();
     if (this.drag || this.state?.status !== 'playing' || !this.inputOpen(performance.now())) return;
     const pt = this.point(e);
     const cell = cellAt(this.layout, pt[0], pt[1]);

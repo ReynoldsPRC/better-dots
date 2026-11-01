@@ -82,3 +82,18 @@ export function enclosedCells(s: GameState, path: readonly number[]): number[] {
   }
   return inside;
 }
+
+/**
+ * A 2x2 square the player could close right now, as a loop path (first cell
+ * repeated at the end), or null. The first one in board order, so the hint is stable.
+ */
+export function hintSquare(s: GameState): number[] | null {
+  for (let r = 0; r + 1 < s.rows; r++) {
+    for (let c = 0; c + 1 < s.cols; c++) {
+      const a = r * s.cols + c;
+      const ring = [a, a + 1, a + s.cols + 1, a + s.cols, a];
+      if (ring.slice(1).every((b, k) => canLink(s, ring[k], b))) return ring;
+    }
+  }
+  return null;
+}

@@ -37,6 +37,8 @@ export function drawScene(
   drag: DragView | null,
   opts: DrawOptions,
   now: number,
+  /** The square hint: a loop path to highlight, and when the highlight started. */
+  hint: { path: readonly number[]; since: number } | null = null,
 ): void {
   const { theme } = opts;
   const { cell } = layout;
@@ -116,6 +118,21 @@ export function drawScene(
       ctx.beginPath();
       ctx.arc(x, y, radius * (1 + (config.select.ringScale - 1) * p), 0, Math.PI * 2);
       ctx.fill();
+    }
+  }
+
+  // Square hint: soft rings that breathe behind the four dots.
+  if (hint && !drag) {
+    const color = connectableColor(state, hint.path[0]);
+    const k = 0.5 - 0.5 * Math.cos((2 * Math.PI * (now - hint.since)) / config.hint.pulseMs);
+    if (color !== null) {
+      ctx.fillStyle = withAlpha(colorOf(theme, color), config.hint.alpha * k);
+      for (const i of new Set(hint.path)) {
+        const [x, y] = toScreen(layout, Math.floor(i / state.cols), i % state.cols);
+        ctx.beginPath();
+        ctx.arc(x, y, radius * config.hint.scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 

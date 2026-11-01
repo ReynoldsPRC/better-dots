@@ -76,14 +76,14 @@ describe('version 1 saves', () => {
         bbb111: { bestMoves: null, assistedOnly: true },
         ccc111: { bestMoves: 14, assistedOnly: false },
       },
-      settings: { colorblind: true, devUnlock: false },
+      settings: { colorblind: true, devUnlock: false, squareHint: false },
       powerUps: 0,
       awarded: { levels: [], worlds: [] },
     });
   });
 
   it('migrateSave is pure', () => {
-    const input = { levels: { '1-1': { bestMoves: 8, assistedOnly: false } }, settings: { colorblind: false, devUnlock: true } };
+    const input = { levels: { '1-1': { bestMoves: 8, assistedOnly: false } }, settings: { colorblind: false, devUnlock: true, squareHint: false } };
     const copy = structuredClone(input);
     const out = migrateSave(input, labels);
     expect(input).toEqual(copy);

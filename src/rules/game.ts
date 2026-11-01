@@ -829,6 +829,33 @@ function finish(
   };
 }
 
+/** How many unused moves turn into bombs when a level is won. */
+export const LEFTOVER_BOMBS = 5;
+
+/**
+ * The finale after a win: the first few unused moves drop as bombs onto
+ * seeded random dots, one at a time, each going off before the next lands.
+ * One step per bomb, each a full result to animate in turn. It changes no
+ * record: moves used stay as they were, and hazards don't react as to a move.
+ */
+export function leftoverBombs(s: GameState): { state: GameState; result: MoveResult }[] {
+  if (s.status !== 'won') return [];
+  const out: { state: GameState; result: MoveResult }[] = [];
+  let state = s;
+  for (let k = 0; k < Math.min(LEFTOVER_BOMBS, movesLeft(s)); k++) {
+    const m = new Move(state);
+    const dots = state.cells.flatMap((p, i) => (p?.kind === 'dot' ? [i] : []));
+    if (dots.length === 0) break;
+    m.waves([{ cell: m.rng.pick(dots), type: 'bomb' }]);
+    m.react();
+    m.settle();
+    const step = finish(state, m, { path: [], color: 0, loop: false, usesMove: false });
+    out.push(step);
+    state = step.state;
+  }
+  return out;
+}
+
 /** The assist: more moves after running out. Marks the attempt as assisted. */
 export function addMoves(s: GameState, n: number = config.assist.moves): GameState {
   return { ...s, extraMoves: s.extraMoves + n, assisted: true, status: s.status === 'lost' ? 'playing' : s.status };

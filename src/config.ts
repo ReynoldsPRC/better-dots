@@ -59,6 +59,15 @@ export const config = {
     ringAlpha: 0.35,
   },
 
+  hint: {
+    /** With the square hint on: how long without input before a square is highlighted. */
+    delayMs: 5000,
+    /** One breath of the highlight's pulse, its peak alpha, and its ring size as a multiple of dot radius. */
+    pulseMs: 1400,
+    alpha: 0.35,
+    scale: 1.6,
+  },
+
   fall: {
     /** Fall speed in cells per second at full speed. */
     speed: 14,

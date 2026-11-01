@@ -20,20 +20,22 @@ export interface Settings {
   colorblind: boolean;
   /** Developer switch: every level unlocked. */
   devUnlock: boolean;
+  /** Highlight an available square after a few seconds without input. */
+  squareHint: boolean;
 }
 
 export interface SaveData {
   version: 2;
   levels: Record<string, LevelRecord>;
   settings: Settings;
-  /** Power-ups on hand (one pool: each can be used as a pick or a color clear). */
+  /** Power-ups on hand (one pool: each can be used as any of the four kinds). */
   powerUps: number;
   /** Awards already given, so each is earned once: level ids (3 stars) and world numbers. */
   awarded: { levels: string[]; worlds: number[] };
 }
 
 export function emptySave(): SaveData {
-  return { version: 2, levels: {}, settings: { colorblind: false, devUnlock: false }, powerUps: 0, awarded: { levels: [], worlds: [] } };
+  return { version: 2, levels: {}, settings: { colorblind: false, devUnlock: false, squareHint: false }, powerUps: 0, awarded: { levels: [], worlds: [] } };
 }
 
 /**
@@ -125,7 +127,7 @@ export function parseSave(raw: unknown, labelToId: ReadonlyMap<string, string>):
     levels[id] = { bestMoves: best, assistedOnly: r.assistedOnly === true };
   }
   const s = (o.settings ?? {}) as Record<string, unknown>;
-  const settings = { colorblind: s.colorblind === true, devUnlock: s.devUnlock === true };
+  const settings = { colorblind: s.colorblind === true, devUnlock: s.devUnlock === true, squareHint: s.squareHint === true };
   if (o.version === 1) return migrateSave({ levels, settings }, labelToId);
   // Saves from before power-ups have neither field.
   const n = o.powerUps ?? 0;

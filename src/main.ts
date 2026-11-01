@@ -34,6 +34,7 @@ const play = new PlayScreen(
   {
     onEnd,
     colorblind: () => save.settings.colorblind,
+    squareHint: () => save.settings.squareHint,
     // The developer switch also makes power-ups free, for testing.
     powerUsed: () => {
       if (!devUnlock()) persist(spendPowerUp(save));
@@ -183,6 +184,9 @@ function openPlayMenu(): void {
 function openSettings(): void {
   showCard('Settings', [
     colorblindToggle(),
+    toggle('Square hint', save.settings.squareHint, (v) => {
+      persist({ ...save, settings: { ...save.settings, squareHint: v } });
+    }),
     toggle('Unlock all levels (developer)', save.settings.devUnlock, (v) => {
       persist({ ...save, settings: { ...save.settings, devUnlock: v } });
     }),
